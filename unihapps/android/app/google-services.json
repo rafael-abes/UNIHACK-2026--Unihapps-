@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "795736347809",
+    "project_id": "unihapps",
+    "storage_bucket": "unihapps.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:795736347809:android:896db0d8f041f8c12d8ce0",
+        "android_client_info": {
+          "package_name": "com.example.unihapps"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAPPQm-b_P9dqB99bEdVGiaTVOkNbKXaqg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
