@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'pages/welcome.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 
@@ -19,10 +20,10 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'UniHapps',
-      home: Scaffold(
-        appBar: AppBar(title: const Text('UniHapps')),
-        body: const Center(child: Text('Firebase Connected')),
+      theme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
       ),
+      home: const WelcomePage(),
     );
   }
 }
