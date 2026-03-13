@@ -1,4 +1,7 @@
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 
 class SignUpPage extends StatefulWidget {
   const SignUpPage({super.key});
@@ -27,12 +30,15 @@ class _SignUpPageState extends State<SignUpPage> {
     super.dispose();
   }
 
-  void _submit() {
-    if (_formKey.currentState!.validate()) {
-      // TODO: handle sign up
-    }
-  }
+  void _submit() async {
+  if (_formKey.currentState!.validate()) {
+    final token = await FirebaseMessaging.instance.getToken();
+    print("FCM Token: $token");
 
+    //TO DO: dont think sign up logic is complete yet, but once a user i able to register their account, 
+    //a unique FCM token will generate, this needs to be saved in the firestore database 
+    // the logic should go: location detection feature detects if a friend is nearby-->gets the friends token and triggers notification function-->sends a notification to the friend using the token
+}}
   @override
   Widget build(BuildContext context) {
     return Scaffold(
