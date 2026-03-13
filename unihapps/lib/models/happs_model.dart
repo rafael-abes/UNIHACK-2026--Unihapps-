@@ -1,6 +1,4 @@
-import 'dart:convert';
-import 'dart:nativewrappers/_internal/vm/lib/ffi_patch.dart';
-import 'package:cloud_firestore/cloud_firestore.dart'; // Import Firestore package
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class HappsModel {
   final String id;
@@ -10,7 +8,6 @@ class HappsModel {
   final String category;
   final GeoPoint location;
   final List<String> participants;
-
 
   HappsModel({
     required this.id,
@@ -22,30 +19,26 @@ class HappsModel {
     required this.participants,
   });
 
-  factory HappsModel.fromJson(Map<String, dynamic> json) {
+  factory HappsModel.fromMap(String id, Map<String, dynamic> map) {
     return HappsModel(
-      id: json['id'] as String? ?? '',
-      organizerId: json['organizerId'] as String? ?? '',
-      title: json['title'] as String? ?? '',
-      when: json['when'] as DateTime? ?? DateTime.now(),
-      category: json['category'] as String? ?? '',
-      location: json['location'] as GeoPoint? ?? GeoPoint(0, 0),
-      participants:json['participants'] != null
-          ? List<String>.from(json['participants'])
-          : [],
+      id: id,
+      organizerId: map['organizerId'] as String? ?? '',
+      title: map['title'] as String? ?? '',
+      when: (map['when'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      category: map['category'] as String? ?? '',
+      location: map['location'] as GeoPoint? ?? GeoPoint(0, 0),
+      participants: List<String>.from(map['participants'] ?? []),
     );
   }
 
-  Map<String, dynamic> toJson() {
+  Map<String, dynamic> toMap() {
     return {
-      'id': id,
       'organizerId': organizerId,
       'title': title,
-      'when': when,
+      'when': Timestamp.fromDate(when),
       'category': category,
       'location': location,
       'participants': participants,
     };
   }
-
 }
