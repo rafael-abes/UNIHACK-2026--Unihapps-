@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'pages/welcome.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 void main() {
   runApp(const MyApp());
