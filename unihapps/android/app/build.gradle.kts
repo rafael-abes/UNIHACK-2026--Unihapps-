@@ -8,6 +8,17 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+import java.util.Properties
+import java.io.FileInputStream
+
+val localProperties = Properties()
+val localPropertiesFile = rootProject.file("local.properties")
+if (localPropertiesFile.exists()) {
+    localPropertiesFile.reader().use { reader ->
+        localProperties.load(reader)
+    }
+}
+
 android {
     namespace = "com.example.unihapps"
     compileSdk = flutter.compileSdkVersion
@@ -32,7 +43,7 @@ android {
         versionCode = flutter.versionCode
         versionName = flutter.versionName
 
-        manifestPlaceholders = [mapsApiKey: localProperties.getProperty('GMP_API_KEY')]
+        manifestPlaceholders["mapsApiKey"] = localProperties.getProperty("GMP_API_KEY") ?: ""
     }
 
     buildTypes {
