@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../services/phone_auth.dart';
+import 'friends_list.dart';
 
 class OTPPage extends StatefulWidget {
   final String verificationId;
@@ -32,6 +33,13 @@ class _OTPPageState extends State<OTPPage> {
         verificationId: widget.verificationId,
         otpCode: otp,
       );
+      if (!mounted) return;
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (_) => const FriendsPage()),
+        (route) => false,
+      );
+
       // AuthWrapper stream detects login and navigates automatically
     } on FirebaseAuthException catch (e) {
       setState(() => isLoading = false);

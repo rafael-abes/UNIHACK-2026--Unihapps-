@@ -1,7 +1,10 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:unihapps/pages/home_page.dart';
+import 'package:unihapps/pages/friends_list.dart';
+import 'package:unihapps/pages/sign_up.dart';
 import 'pages/welcome.dart';
+import 'models/user_model.dart';
+import 'repositories/user_repositories.dart';
 import 'pages/home_page.dart';
 
 class AuthWrapper extends StatelessWidget {
@@ -32,9 +35,32 @@ class AuthWrapper extends StatelessWidget {
         }
 
         // logged in — pass uid to HomePage if needed
-        final user = snapshot.data!;
-        return HomePage();
+        _ensureUserDocument(snapshot.data!);
+        return const WelcomePage();
       },
     );
+  }
+
+  Future<void> _ensureUserDocument(User user) async {
+    final _userRepository = UserRepository();
+
+    // Use repository to check if user exists
+    final existingUser = await _userRepository.getUser(user.uid);
+
+    // Only create if doesn't exist
+    if (existingUser == null) {
+      final newUser = UserModel(
+        id: user.uid,
+        firstName: user.displayName?.split(' ').first ?? '',
+        lastName: user.displayName?.split(' ').last ?? '',
+        username: '',
+        email: user.email ?? '',
+        phone: '',
+        friends: [],
+        preferences: [],
+        schedule: {},
+      );
+      await _userRepository.createUser(newUser);
+    }
   }
 }
