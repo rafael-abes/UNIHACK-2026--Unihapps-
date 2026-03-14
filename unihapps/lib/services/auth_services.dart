@@ -2,6 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import '../models/user_model.dart';
 import '../repositories/user_repositories.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -38,20 +39,23 @@ class AuthService {
     final result = await _auth.signInWithCredential(credential);
 
     // Create Firestore doc using repository — only if new user
-    if (result.additionalUserInfo?.isNewUser == true) {
-      final user = UserModel(
-        id: result.user!.uid,
-        firstName: result.user?.displayName?.split(' ').first ?? '',
-        lastName: result.user?.displayName?.split(' ').last ?? '',
-        username: '',
-        email: result.user?.email ?? '',
-        phone: '',
-        friends: [],
-        preferences: [],
-        schedule: {}
-      );
-      await _userRepository.createUser(user);
-    }
+   if (result.additionalUserInfo?.isNewUser == true) {
+  final token = await FirebaseMessaging.instance.getToken() ?? '';
+  
+  final user = UserModel(
+    id: result.user!.uid,
+    firstName: result.user?.displayName?.split(' ').first ?? '',
+    lastName: result.user?.displayName?.split(' ').last ?? '',
+    username: '',
+    email: result.user?.email ?? '',
+    phone: '',
+    friends: [],
+    preferences: [],
+    schedule: {},
+    fcmToken: token, // ← add this
+  );
+  await _userRepository.createUser(user);
+}
 
     return result;
   }

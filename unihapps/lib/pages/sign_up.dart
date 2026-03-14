@@ -210,6 +210,8 @@ class _SignUpPageState extends State<SignUpPage> {
       );
       final uid = credential.user?.uid;
       if (uid != null) {
+        final token = await FirebaseMessaging.instance.getToken() ?? ''; // ← move here
+        print("FCM Token: $token");
         final user = UserModel(
           id: uid,
           firstName: _firstNameController.text.trim(),
@@ -220,8 +222,10 @@ class _SignUpPageState extends State<SignUpPage> {
           friends: [],
           preferences: _selectedPreferences.toList(),
           schedule: _scheduleForModel,
+          fcmToken: token, // ← add this
         );
         await _userRepository.createUser(user);
+        print("User saved to Firestore!");
       }
       // AuthWrapper stream handles navigation automatically
     } on FirebaseAuthException catch (e) {

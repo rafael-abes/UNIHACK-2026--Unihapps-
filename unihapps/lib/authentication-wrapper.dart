@@ -6,6 +6,7 @@ import 'pages/welcome.dart';
 import 'models/user_model.dart';
 import 'repositories/user_repositories.dart';
 import 'pages/home_page.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 
 class AuthWrapper extends StatelessWidget {
   const AuthWrapper({super.key});
@@ -42,25 +43,25 @@ class AuthWrapper extends StatelessWidget {
   }
 
   Future<void> _ensureUserDocument(User user) async {
-    final _userRepository = UserRepository();
+  final _userRepository = UserRepository();
+  final existingUser = await _userRepository.getUser(user.uid);
 
-    // Use repository to check if user exists
-    final existingUser = await _userRepository.getUser(user.uid);
-
-    // Only create if doesn't exist
-    if (existingUser == null) {
-      final newUser = UserModel(
-        id: user.uid,
-        firstName: user.displayName?.split(' ').first ?? '',
-        lastName: user.displayName?.split(' ').last ?? '',
-        username: '',
-        email: user.email ?? '',
-        phone: '',
-        friends: [],
-        preferences: [],
-        schedule: {},
-      );
-      await _userRepository.createUser(newUser);
-    }
+  if (existingUser == null) {
+    final token = await FirebaseMessaging.instance.getToken() ?? '';
+    
+    final newUser = UserModel(
+      id: user.uid,
+      firstName: user.displayName?.split(' ').first ?? '',
+      lastName: user.displayName?.split(' ').last ?? '',
+      username: '',
+      email: user.email ?? '',
+      phone: '',
+      friends: [],
+      preferences: [],
+      schedule: {},
+      fcmToken: token, // ← add this
+    );
+    await _userRepository.createUser(newUser);
   }
+}
 }
