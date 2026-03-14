@@ -31,6 +31,8 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+
+        manifestPlaceholders = [mapsApiKey: localProperties.getProperty('GMP_API_KEY')]
     }
 
     buildTypes {
