@@ -19,30 +19,26 @@ class UserModel {
     required this.schedule,
   });
 
-  factory UserModel.fromJson(Map<String, dynamic> json) {
+  factory UserModel.fromMap(String id, Map<String, dynamic> map) {
     return UserModel(
-      id: json['id'] as String? ?? '',
-      firstName: json['firstName'] as String? ?? '',
-      lastName: json['lastName'] as String? ?? '',
-      username: json['username'] as String? ?? '',
-      email: json['email'] as String? ?? '',
-      preferences: (json['preferences'] as List<dynamic>?)
-            ?.map((item) => item as String)
-            .toList() ??
-        [],
-      schedule: (json['schedule'] as Map<String, dynamic>?)?.map(
-          (key, value) => MapEntry(
-            key,
-            (value as List<dynamic>).map((item) => item as String).toList(),
-          ),
-        ) ??
-        {},
+      id: id,
+      firstName: map['firstName'] as String? ?? '',
+      lastName: map['lastName'] as String? ?? '',
+      username: map['username'] as String? ?? '',
+      email: map['email'] as String? ?? '',
+      preferences: List<String>.from(map['preferences'] ?? []),
+      schedule: (map['schedule'] as Map<String, dynamic>?)?.map(
+            (key, value) => MapEntry(
+              key,
+              List<String>.from(value),
+            ),
+          ) ??
+          {},
     );
   }
 
-  Map<String, dynamic> toJson() {
+  Map<String, dynamic> toMap() {
     return {
-      'id': id,
       'firstName': firstName,
       'lastName': lastName,
       'username': username,
@@ -51,5 +47,4 @@ class UserModel {
       'schedule': schedule,
     };
   }
-
 }
