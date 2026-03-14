@@ -22,8 +22,8 @@ class UserRepository {
 
     if (!doc.exists) return [];
 
-    final data = doc.data()!;
-    return List<String>.from(data["friends"] ?? []);
+    final data = doc.data() as Map<String, dynamic>;
+    return List<String>.from(data["friendsList"] ?? []);
   }
 
 
