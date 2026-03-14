@@ -7,6 +7,8 @@ class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final UserRepository _userRepository = UserRepository();
 
+  
+
   // Email & Password Sign Up
   Future<UserCredential> signUpWithEmail({
     required String email,
