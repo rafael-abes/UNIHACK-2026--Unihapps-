@@ -1,10 +1,11 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:unihapps/pages/friends_list.dart';
+import 'package:unihapps/pages/sign_up.dart';
 import 'pages/welcome.dart';
 import 'models/user_model.dart';
 import 'repositories/user_repositories.dart';
-// import 'pages/home_page.dart';
+import 'pages/home_page.dart';
 
 class AuthWrapper extends StatelessWidget {
   const AuthWrapper({super.key});
@@ -30,12 +31,12 @@ class AuthWrapper extends StatelessWidget {
 
         // logged out
         if (!snapshot.hasData) {
-          return const HomePage();
+          return const WelcomePage();
         }
 
         // logged in — pass uid to HomePage if needed
         _ensureUserDocument(snapshot.data!);
-        return const FriendsPage();
+        return const WelcomePage();
       },
     );
   }
