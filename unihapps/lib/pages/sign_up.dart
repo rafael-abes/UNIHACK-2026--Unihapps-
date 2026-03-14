@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/user_model.dart';
 import '../repositories/user_repositories.dart';
+import 'friends_list.dart';
 
 class SignUpPage extends StatefulWidget {
   const SignUpPage({super.key});
@@ -79,6 +80,12 @@ class _SignUpPageState extends State<SignUpPage> {
     setState(() => _isLoading = true);
     try {
       await _authService.signInWithGoogle();
+       if (!mounted) return;
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (_) => const FriendsPage()),
+        (route) => false,
+      );
     } catch (e) {
       ScaffoldMessenger.of(
         context,
