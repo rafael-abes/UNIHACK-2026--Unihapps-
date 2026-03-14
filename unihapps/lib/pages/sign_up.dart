@@ -3,8 +3,12 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../services/auth_services.dart';
 import 'phone_login.dart';
 import 'package:flutter/services.dart';
-import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../models/user_model.dart';
+import '../repositories/user_repositories.dart';
+import 'friends_list.dart';
+import 'package:flutter/services.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 
 class SignUpPage extends StatefulWidget {
   const SignUpPage({super.key});
@@ -15,6 +19,7 @@ class SignUpPage extends StatefulWidget {
 
 class _SignUpPageState extends State<SignUpPage> {
   final _formKey = GlobalKey<FormState>();
+  final UserRepository _userRepository = UserRepository();
   bool _obscurePassword = true;
   bool _isLoading = false;
 
@@ -92,9 +97,15 @@ class _SignUpPageState extends State<SignUpPage> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Start', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                    const Text(
+                      'Start',
+                      style: TextStyle(fontSize: 12, color: Colors.grey),
+                    ),
                     const SizedBox(height: 4),
-                    _TimeInputRow(hourCtrl: startHourCtrl, minCtrl: startMinCtrl),
+                    _TimeInputRow(
+                      hourCtrl: startHourCtrl,
+                      minCtrl: startMinCtrl,
+                    ),
                   ],
                 ),
               ),
@@ -104,7 +115,10 @@ class _SignUpPageState extends State<SignUpPage> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('End', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                    const Text(
+                      'End',
+                      style: TextStyle(fontSize: 12, color: Colors.grey),
+                    ),
                     const SizedBox(height: 4),
                     _TimeInputRow(hourCtrl: endHourCtrl, minCtrl: endMinCtrl),
                   ],
@@ -174,28 +188,33 @@ class _SignUpPageState extends State<SignUpPage> {
   // Email sign up
   Future<void> _submit() async {
     print("=== SUBMIT PRESSED ==="); // ← add here
-    if (!_formKey.currentState!.validate()){
-    print("=== VALIDATION FAILED ==="); // ← add here
-    return;
-  }
+    if (!_formKey.currentState!.validate()) {
+      print("=== VALIDATION FAILED ==="); // ← add here
+      return;
+    }
     setState(() => _isLoading = true);
     try {
-      await _authService.signUpWithEmail(
+      final credential = await _authService.signUpWithEmail(
         email: _emailController.text.trim(),
         password: _passwordController.text,
         displayName:
             '${_firstNameController.text.trim()} ${_lastNameController.text.trim()}',
       );
-
-      final user = FirebaseAuth.instance.currentUser;
-    final token = await FirebaseMessaging.instance.getToken() ?? '';
-    if (user != null && token.isNotEmpty) {
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(user.uid)
-          .set({'fcmToken': token}, SetOptions(merge: true));
-      print("FCM Token saved: $token");
-    }
+      final uid = credential.user?.uid;
+      if (uid != null) {
+        final user = UserModel(
+          id: uid,
+          firstName: _firstNameController.text.trim(),
+          lastName: _lastNameController.text.trim(),
+          username: _usernameController.text.trim(),
+          email: _emailController.text.trim(),
+          phone: '',
+          friends: [],
+          preferences: [],
+          schedule: {},
+        );
+        await _userRepository.createUser(user);
+      }
       // AuthWrapper stream handles navigation automatically
     } on FirebaseAuthException catch (e) {
       ScaffoldMessenger.of(
@@ -211,20 +230,12 @@ class _SignUpPageState extends State<SignUpPage> {
     setState(() => _isLoading = true);
     try {
       await _authService.signInWithGoogle();
-    } catch (e) {
-      ScaffoldMessenger.of(
+      if (!mounted) return;
+      Navigator.pushAndRemoveUntil(
         context,
-      ).showSnackBar(SnackBar(content: Text(e.toString())));
-    } finally {
-      setState(() => _isLoading = false);
-    }
-  }
-
-  // Anonymous sign in
-  Future<void> _signInAnonymously() async {
-    setState(() => _isLoading = true);
-    try {
-      await _authService.signInAnonymously();
+        MaterialPageRoute(builder: (_) => const FriendsPage()),
+        (route) => false,
+      );
     } catch (e) {
       ScaffoldMessenger.of(
         context,
@@ -247,7 +258,7 @@ class _SignUpPageState extends State<SignUpPage> {
               key: _formKey,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
+                children: [
                   TextFormField(
                     controller: _firstNameController,
                     decoration: const InputDecoration(labelText: 'First Name'),
@@ -329,63 +340,71 @@ class _SignUpPageState extends State<SignUpPage> {
                       return null;
                     },
                   ),
-    
-              // ── Preferences ──────────────────────────────────────────────
-              const SizedBox(height: 32),
-              Text('Preferences', style: Theme.of(context).textTheme.titleMedium),
-              const SizedBox(height: 4),
-              const Text(
-                'Select one or more interests',
-                style: TextStyle(fontSize: 12, color: Colors.grey),
-              ),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                runSpacing: 4,
-                children: _availablePreferences.map((pref) {
-                  final selected = _selectedPreferences.contains(pref);
-                  return FilterChip(
-                    label: Text(pref),
-                    selected: selected,
-                    onSelected: (on) {
-                      setState(() {
-                        if (on) {
-                          _selectedPreferences.add(pref);
-                        } else {
-                          _selectedPreferences.remove(pref);
-                        }
-                        _preferenceError = _selectedPreferences.isEmpty;
-                      });
-                    },
-                  );
-                }).toList(),
-              ),
-              if (_preferenceError)
-                const Padding(
-                  padding: EdgeInsets.only(top: 6, left: 12),
-                  child: Text(
-                    'Please select at least one preference',
-                    style: TextStyle(color: Colors.red, fontSize: 12),
+
+                  // ── Preferences ──────────────────────────────────────────────
+                  const SizedBox(height: 32),
+                  Text(
+                    'Preferences',
+                    style: Theme.of(context).textTheme.titleMedium,
                   ),
-                ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'Select one or more interests',
+                    style: TextStyle(fontSize: 12, color: Colors.grey),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 4,
+                    children: _availablePreferences.map((pref) {
+                      final selected = _selectedPreferences.contains(pref);
+                      return FilterChip(
+                        label: Text(pref),
+                        selected: selected,
+                        onSelected: (on) {
+                          setState(() {
+                            if (on) {
+                              _selectedPreferences.add(pref);
+                            } else {
+                              _selectedPreferences.remove(pref);
+                            }
+                            _preferenceError = _selectedPreferences.isEmpty;
+                          });
+                        },
+                      );
+                    }).toList(),
+                  ),
+                  if (_preferenceError)
+                    const Padding(
+                      padding: EdgeInsets.only(top: 6, left: 12),
+                      child: Text(
+                        'Please select at least one preference',
+                        style: TextStyle(color: Colors.red, fontSize: 12),
+                      ),
+                    ),
 
-              // ── Schedule ─────────────────────────────────────────────────
-              const SizedBox(height: 32),
-              Text('Availability', style: Theme.of(context).textTheme.titleMedium),
-              const SizedBox(height: 4),
-              const Text(
-                'Add your available time blocks (24-hour format)',
-                style: TextStyle(fontSize: 12, color: Colors.grey),
-              ),
-              const SizedBox(height: 8),
-              ..._weekdays.map((day) => _DayScheduleTile(
-                    day: day,
-                    blocks: _schedule[day]!,
-                    onAdd: () => _addTimeBlock(day),
-                    onRemove: (i) => _removeTimeBlock(day, i),
-                  )),
+                  // ── Schedule ─────────────────────────────────────────────────
+                  const SizedBox(height: 32),
+                  Text(
+                    'Availability',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'Add your available time blocks (24-hour format)',
+                    style: TextStyle(fontSize: 12, color: Colors.grey),
+                  ),
+                  const SizedBox(height: 8),
+                  ..._weekdays.map(
+                    (day) => _DayScheduleTile(
+                      day: day,
+                      blocks: _schedule[day]!,
+                      onAdd: () => _addTimeBlock(day),
+                      onRemove: (i) => _removeTimeBlock(day, i),
+                    ),
+                  ),
 
-              const SizedBox(height: 24),
+                  const SizedBox(height: 24),
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
@@ -444,18 +463,6 @@ class _SignUpPageState extends State<SignUpPage> {
                       ),
                 icon: const Icon(Icons.phone),
                 label: const Text('Continue with Phone'),
-              ),
-            ),
-
-            const SizedBox(height: 12),
-
-            // ── Anonymous Sign In ──
-            SizedBox(
-              width: double.infinity,
-              child: TextButton.icon(
-                onPressed: _isLoading ? null : _signInAnonymously,
-                icon: const Icon(Icons.person_outline),
-                label: const Text('Continue as Guest'),
               ),
             ),
           ],
@@ -542,10 +549,16 @@ class _DayScheduleTile extends StatelessWidget {
           children: [
             SizedBox(
               width: 100,
-              child: Text(day, style: const TextStyle(fontWeight: FontWeight.w500)),
+              child: Text(
+                day,
+                style: const TextStyle(fontWeight: FontWeight.w500),
+              ),
             ),
             if (blocks.isEmpty)
-              const Text('No blocks', style: TextStyle(color: Colors.grey, fontSize: 13)),
+              const Text(
+                'No blocks',
+                style: TextStyle(color: Colors.grey, fontSize: 13),
+              ),
             ...blocks.asMap().entries.map(
               (entry) => Padding(
                 padding: const EdgeInsets.only(right: 6),
