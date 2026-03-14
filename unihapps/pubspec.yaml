@@ -2,7 +2,7 @@ name: unihapps
 description: "A new Flutter project."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
-publish_to: 'none' # Remove this line if you wish to publish to pub.dev
+publish_to: "none" # Remove this line if you wish to publish to pub.dev
 
 # The following defines the version and build number for your application.
 # A version number is three numbers separated by dots, like 1.2.43
@@ -36,6 +36,9 @@ dependencies:
   cupertino_icons: ^1.0.8
   firebase_core: ^4.5.0
   firebase_auth: ^6.2.0
+  intl_phone_field: ^3.2.0 # for phone number input with country code
+  google_sign_in: ^6.2.1
+  country_picker: ^2.0.26
   cloud_firestore: ^6.1.3
 
   flutter_svg: ^2.0.17
@@ -59,7 +62,6 @@ dev_dependencies:
 
 # The following section is specific to Flutter packages.
 flutter:
-
   # The following line ensures that the Material Icons font is
   # included with your application, so that you can use the icons in
   # the material Icons class.
