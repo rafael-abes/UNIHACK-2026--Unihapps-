@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:nativewrappers/_internal/vm/lib/ffi_patch.dart';
 
 class UserModel {
   final String id;
@@ -9,8 +8,6 @@ class UserModel {
   final String email;
   final List<String> preferences;
   final Map<String, List<String>> schedule;
-
-
 
   UserModel({
     required this.id,
