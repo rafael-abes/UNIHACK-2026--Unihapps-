@@ -3,6 +3,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../services/auth_services.dart';
 import 'phone_login.dart';
 import 'package:flutter/services.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class SignUpPage extends StatefulWidget {
   const SignUpPage({super.key});
@@ -171,7 +173,11 @@ class _SignUpPageState extends State<SignUpPage> {
 
   // Email sign up
   Future<void> _submit() async {
-    if (!_formKey.currentState!.validate()) return;
+    print("=== SUBMIT PRESSED ==="); // ← add here
+    if (!_formKey.currentState!.validate()){
+    print("=== VALIDATION FAILED ==="); // ← add here
+    return;
+  }
     setState(() => _isLoading = true);
     try {
       await _authService.signUpWithEmail(
@@ -180,6 +186,16 @@ class _SignUpPageState extends State<SignUpPage> {
         displayName:
             '${_firstNameController.text.trim()} ${_lastNameController.text.trim()}',
       );
+
+      final user = FirebaseAuth.instance.currentUser;
+    final token = await FirebaseMessaging.instance.getToken() ?? '';
+    if (user != null && token.isNotEmpty) {
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .set({'fcmToken': token}, SetOptions(merge: true));
+      print("FCM Token saved: $token");
+    }
       // AuthWrapper stream handles navigation automatically
     } on FirebaseAuthException catch (e) {
       ScaffoldMessenger.of(
