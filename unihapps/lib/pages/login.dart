@@ -4,6 +4,7 @@ import '../services/auth_services.dart';
 import 'phone_login.dart';
 import 'sign_up.dart';
 import 'friends_list.dart';
+import 'home_page.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -60,7 +61,7 @@ class _LoginPageState extends State<LoginPage>
       if (!mounted) return;
       Navigator.pushAndRemoveUntil(
         context,
-        MaterialPageRoute(builder: (_) => const FriendsPage()),
+        MaterialPageRoute(builder: (_) => const HomePage()),
         (route) => false,
       );
     } on FirebaseAuthException catch (e) {
@@ -87,7 +88,7 @@ class _LoginPageState extends State<LoginPage>
       if (!mounted) return;
       Navigator.pushAndRemoveUntil(
         context,
-        MaterialPageRoute(builder: (_) => const FriendsPage()),
+        MaterialPageRoute(builder: (_) => const HomePage()),
         (route) => false,
       );
     } catch (e) {

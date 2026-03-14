@@ -6,6 +6,8 @@ import 'package:flutter_contacts/flutter_contacts.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'dart:async';
 import '../repositories/user_repositories.dart';
+import 'home_page.dart';
+import 'profile_page.dart';
 
 // Top-level function for compute()
 List<String> _extractPhoneNumbers(List<Contact> contacts) {
@@ -30,8 +32,7 @@ class FriendsPage extends StatefulWidget {
   State<FriendsPage> createState() => _FriendsPageState();
 }
 
-class _FriendsPageState extends State<FriendsPage>
-    with SingleTickerProviderStateMixin {
+class _FriendsPageState extends State<FriendsPage> {
   final _searchController = TextEditingController();
   final _firestore = FirebaseFirestore.instance;
   final _auth = FirebaseAuth.instance;
@@ -44,6 +45,7 @@ class _FriendsPageState extends State<FriendsPage>
   List<String> _incomingRequestIds = []; // ← track incoming requests
 
   bool _isSearching = false;
+  bool _hasSearched = false;
   bool _isSyncingContacts = false;
   bool _hasSearched = false;
 
@@ -61,7 +63,6 @@ class _FriendsPageState extends State<FriendsPage>
   void dispose() {
     _debounceTimer?.cancel();
     _searchController.dispose();
-    _tabController.dispose();
     super.dispose();
   }
 
@@ -83,7 +84,6 @@ class _FriendsPageState extends State<FriendsPage>
     }
   }
 
-  // Search users by username
   Future<void> _searchByUsername(String query) async {
     if (query.trim().isEmpty) {
       if (!mounted) return;
@@ -184,10 +184,9 @@ class _FriendsPageState extends State<FriendsPage>
     ).showSnackBar(const SnackBar(content: Text('Friend request declined')));
   }
 
-  // Sync contacts
   Future<void> _syncContacts() async {
     if (!mounted) return;
-    setState(() => _isSyncingContacts = true);  // ← moved to top, fixed
+    setState(() => _isSyncingContacts = true);
 
     try {
       final status = await Permission.contacts.request();
@@ -235,8 +234,7 @@ class _FriendsPageState extends State<FriendsPage>
         if (!mounted) return;
         setState(() => _isSyncingContacts = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content: Text('No phone numbers found in contacts')),
+          const SnackBar(content: Text('No phone numbers found in contacts')),
         );
         return;
       }
@@ -264,7 +262,7 @@ class _FriendsPageState extends State<FriendsPage>
 
       if (!mounted) return;
       setState(() {
-        _contactMatches = matches;          // ← sets matches correctly
+        _contactMatches = matches;
         _isSyncingContacts = false;
       });
 
@@ -285,6 +283,9 @@ class _FriendsPageState extends State<FriendsPage>
       ).showSnackBar(SnackBar(content: Text('Error syncing contacts: $e')));
     }
   }
+
+  List<Map<String, dynamic>> get _displayList =>
+      _hasSearched ? _searchResults : _contactMatches;
 
   @override
   Widget build(BuildContext context) {
@@ -429,7 +430,7 @@ class _FriendsPageState extends State<FriendsPage>
     );
   }
 
-  Widget _buildSearchResults() {
+  Widget _buildBody() {
     if (_isSearching) {
       return const Center(child: CircularProgressIndicator());
     }
