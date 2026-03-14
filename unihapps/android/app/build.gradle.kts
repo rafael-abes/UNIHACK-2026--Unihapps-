@@ -6,6 +6,17 @@ plugins {
     id("kotlin-android")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
+    
+}
+import java.util.Properties
+import java.io.FileInputStream
+
+val localProperties = Properties()
+val localPropertiesFile = rootProject.file("local.properties")
+if (localPropertiesFile.exists()) {
+    localPropertiesFile.reader().use { reader ->
+        localProperties.load(reader)
+    }
 }
 
 import java.util.Properties
