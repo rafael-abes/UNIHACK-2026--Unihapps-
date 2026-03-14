@@ -8,8 +8,13 @@ import 'package:permission_handler/permission_handler.dart';
 // Top-level function for compute() — must be outside the class
 List<String> _extractPhoneNumbers(List<Contact> contacts) {
   return contacts
-      .expand((c) =>
-          c.phones.map((p) => p.number.replaceAll(RegExp(r'\s|-|\(|\)'), '')))
+      .expand((c) => c.phones.map((p) {
+            String number = p.number.replaceAll(RegExp(r'\s|-|\(|\)'), '');
+            if (number.startsWith('0')) {
+              number = '+61${number.substring(1)}';
+            }
+            return number;
+          }))
       .toSet()
       .toList();
 }
@@ -29,11 +34,11 @@ class _FriendsPageState extends State<FriendsPage>
 
   List<Map<String, dynamic>> _searchResults = [];
   List<Map<String, dynamic>> _contactMatches = [];
+  List<String> _friendIds = [];             // ← added this
 
   bool _isSearching = false;
   bool _isSyncingContacts = false;
   bool _hasSearched = false;
-  bool _isLoadingFriends = true;
 
   late TabController _tabController;
 
@@ -41,6 +46,7 @@ class _FriendsPageState extends State<FriendsPage>
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    _loadFriendIds();                        // ← load on init
   }
 
   @override
@@ -48,6 +54,21 @@ class _FriendsPageState extends State<FriendsPage>
     _searchController.dispose();
     _tabController.dispose();
     super.dispose();
+  }
+
+  // Load current user's friend IDs into local state
+  Future<void> _loadFriendIds() async {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) return;
+
+    final doc = await _firestore.collection('users').doc(uid).get();
+    if (!mounted) return;
+
+    setState(() {
+      _friendIds = (doc.exists ?? false)
+          ? List<String>.from(doc.data()?['friends'] ?? [])
+          : [];
+    });
   }
 
   // Search users by username
@@ -102,6 +123,8 @@ class _FriendsPageState extends State<FriendsPage>
     }, SetOptions(merge: true));
 
     if (!mounted) return;
+    setState(() => _friendIds.add(friendUid));  // ← update local list
+
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Friend added!')),
     );
@@ -110,7 +133,7 @@ class _FriendsPageState extends State<FriendsPage>
   // Sync contacts
   Future<void> _syncContacts() async {
     if (!mounted) return;
-    setState(() => _isSyncingContacts = true);
+    setState(() => _isSyncingContacts = true);  // ← moved to top, fixed
 
     // Check current permission status
     final status = await Permission.contacts.status;
@@ -147,14 +170,14 @@ class _FriendsPageState extends State<FriendsPage>
       final contacts =
           await FlutterContacts.getContacts(withProperties: true);
 
-      // Process off main thread
       final phoneNumbers = await compute(_extractPhoneNumbers, contacts);
 
       if (phoneNumbers.isEmpty) {
         if (!mounted) return;
         setState(() => _isSyncingContacts = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('No phone numbers found in contacts')),
+          const SnackBar(
+              content: Text('No phone numbers found in contacts')),
         );
         return;
       }
@@ -162,7 +185,6 @@ class _FriendsPageState extends State<FriendsPage>
       final currentUid = _auth.currentUser?.uid;
       final List<Map<String, dynamic>> matches = [];
 
-      // Batch in groups of 10 — Firestore whereIn limit
       for (int i = 0; i < phoneNumbers.length; i += 10) {
         final batch = phoneNumbers.sublist(
           i,
@@ -181,7 +203,7 @@ class _FriendsPageState extends State<FriendsPage>
 
       if (!mounted) return;
       setState(() {
-        _contactMatches = matches;
+        _contactMatches = matches;          // ← sets matches correctly
         _isSyncingContacts = false;
       });
 
@@ -240,7 +262,6 @@ class _FriendsPageState extends State<FriendsPage>
   Widget _buildFindFriendsTab() {
     return Column(
       children: [
-        // Search bar
         Padding(
           padding: const EdgeInsets.all(16),
           child: TextField(
@@ -278,7 +299,6 @@ class _FriendsPageState extends State<FriendsPage>
           ),
         ),
 
-        // Sync contacts button
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: SizedBox(
@@ -308,15 +328,44 @@ class _FriendsPageState extends State<FriendsPage>
         ),
 
         const SizedBox(height: 16),
-
         Expanded(child: _buildSearchResults()),
       ],
     );
   }
 
   Widget _buildSearchResults() {
-    // Contact matches after sync
-    if (!_hasSearched && _contactMatches.isNotEmpty) {
+    if (_isSearching) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (_hasSearched) {
+      if (_searchResults.isEmpty) {
+        return Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.person_search, size: 64, color: Colors.grey),
+              const SizedBox(height: 12),
+              Text(
+                'No users found for "${_searchController.text}"',
+                style: const TextStyle(color: Colors.grey),
+              ),
+            ],
+          ),
+        );
+      }
+
+      return ListView.builder(
+        itemCount: _searchResults.length,
+        itemBuilder: (context, index) => _buildUserTile(
+          _searchResults[index],
+          friendIds: _friendIds,   // ← passed correctly
+        ),
+      );
+    }
+
+    // Contact matches shown after sync
+    if (_contactMatches.isNotEmpty) {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -335,43 +384,16 @@ class _FriendsPageState extends State<FriendsPage>
           Expanded(
             child: ListView.builder(
               itemCount: _contactMatches.length,
-              itemBuilder: (context, index) =>
-                  _buildUserTile(_contactMatches[index]),
+              itemBuilder: (context, index) => _buildUserTile(
+                _contactMatches[index],
+                friendIds: _friendIds,   // ← passed correctly
+              ),
             ),
           ),
         ],
       );
     }
 
-    if (_isSearching) {
-      return const Center(child: CircularProgressIndicator());
-    }
-
-    if (_hasSearched && _searchResults.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.person_search, size: 64, color: Colors.grey),
-            const SizedBox(height: 12),
-            Text(
-              'No users found for "${_searchController.text}"',
-              style: const TextStyle(color: Colors.grey),
-            ),
-          ],
-        ),
-      );
-    }
-
-    if (_searchResults.isNotEmpty) {
-      return ListView.builder(
-        itemCount: _searchResults.length,
-        itemBuilder: (context, index) =>
-            _buildUserTile(_searchResults[index]),
-      );
-    }
-
-    // Default empty state
     return const Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -388,7 +410,6 @@ class _FriendsPageState extends State<FriendsPage>
     );
   }
 
-  // My Friends tab — uses StreamBuilder for live updates
   Widget _buildMyFriendsTab() {
     final uid = _auth.currentUser?.uid;
     if (uid == null) return const SizedBox();
@@ -400,8 +421,9 @@ class _FriendsPageState extends State<FriendsPage>
           return const Center(child: CircularProgressIndicator());
         }
 
-        final friendIds =
-            List<String>.from(snapshot.data?.get('friends') ?? []);
+        final friendIds = (snapshot.data?.exists ?? false)
+            ? List<String>.from(snapshot.data?.get('friends') ?? [])
+            : <String>[];                    // ← null safe
 
         if (friendIds.isEmpty) {
           return const Center(
@@ -450,89 +472,77 @@ class _FriendsPageState extends State<FriendsPage>
   Widget _buildUserTile(
     Map<String, dynamic> user, {
     bool showAddButton = true,
+    List<String> friendIds = const [],   // ← parameter added
   }) {
-    final uid = _auth.currentUser?.uid;
     final displayName =
         '${user['firstName'] ?? ''} ${user['lastName'] ?? ''}'.trim();
     final username = user['username'] ?? '';
     final initials = displayName.isNotEmpty
         ? displayName.split(' ').map((e) => e[0]).take(2).join()
         : '?';
+    final alreadyFriend = friendIds.contains(user['uid']); // ← local check
 
-    return StreamBuilder<DocumentSnapshot>(
-      stream: uid != null
-          ? _firestore.collection('users').doc(uid).snapshots()
-          : const Stream.empty(),
-      builder: (context, snapshot) {
-        final friendIds =
-            List<String>.from(snapshot.data?.get('friends') ?? []);
-        final alreadyFriend = friendIds.contains(user['uid']);
-
-        return Container(
-          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.deepPurple.withOpacity(0.06),
-                blurRadius: 10,
-                offset: const Offset(0, 2),
-              ),
-            ],
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.deepPurple.withOpacity(0.06),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
           ),
-          child: ListTile(
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            leading: CircleAvatar(
-              radius: 24,
-              backgroundColor: Colors.deepPurple.shade100,
-              backgroundImage: user['photoURL'] != null
-                  ? NetworkImage(user['photoURL'])
-                  : null,
-              child: user['photoURL'] == null
-                  ? Text(
-                      initials,
-                      style: const TextStyle(
-                        color: Colors.deepPurple,
-                        fontWeight: FontWeight.bold,
+        ],
+      ),
+      child: ListTile(
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        leading: CircleAvatar(
+          radius: 24,
+          backgroundColor: Colors.deepPurple.shade100,
+          backgroundImage: user['photoURL'] != null
+              ? NetworkImage(user['photoURL'])
+              : null,
+          child: user['photoURL'] == null
+              ? Text(
+                  initials,
+                  style: const TextStyle(
+                    color: Colors.deepPurple,
+                    fontWeight: FontWeight.bold,
+                  ),
+                )
+              : null,
+        ),
+        title: Text(
+          displayName.isNotEmpty ? displayName : username,
+          style: const TextStyle(fontWeight: FontWeight.w600),
+        ),
+        subtitle: Text(
+          '@$username',
+          style: const TextStyle(color: Colors.grey, fontSize: 13),
+        ),
+        trailing: showAddButton
+            ? alreadyFriend
+                ? const Chip(
+                    label: Text('Friends',
+                        style: TextStyle(color: Colors.deepPurple)),
+                    backgroundColor: Color(0xFFEDE7F6),
+                  )
+                : ElevatedButton(
+                    onPressed: () => _addFriend(user['uid']),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.deepPurple,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
                       ),
-                    )
-                  : null,
-            ),
-            title: Text(
-              displayName.isNotEmpty ? displayName : username,
-              style: const TextStyle(fontWeight: FontWeight.w600),
-            ),
-            subtitle: Text(
-              '@$username',
-              style: const TextStyle(color: Colors.grey, fontSize: 13),
-            ),
-            trailing: showAddButton
-                ? alreadyFriend
-                    ? const Chip(
-                        label: Text('Friends',
-                            style: TextStyle(color: Colors.deepPurple)),
-                        backgroundColor: Color(0xFFEDE7F6),
-                      )
-                    : ElevatedButton(
-                        onPressed: () => _addFriend(user['uid']),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.deepPurple,
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          padding:
-                              const EdgeInsets.symmetric(horizontal: 16),
-                        ),
-                        child: const Text('Add'),
-                      )
-                : null,
-          ),
-        );
-      },
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                    ),
+                    child: const Text('Add'),
+                  )
+            : null,
+      ),
     );
   }
 }
-
