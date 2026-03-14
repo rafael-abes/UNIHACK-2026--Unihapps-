@@ -4,6 +4,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_contacts/flutter_contacts.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'home_page.dart';
+import 'profile_page.dart';
 
 // Top-level function for compute() — must be outside the class
 List<String> _extractPhoneNumbers(List<Contact> contacts) {
@@ -26,37 +28,31 @@ class FriendsPage extends StatefulWidget {
   State<FriendsPage> createState() => _FriendsPageState();
 }
 
-class _FriendsPageState extends State<FriendsPage>
-    with SingleTickerProviderStateMixin {
+class _FriendsPageState extends State<FriendsPage> {
   final _searchController = TextEditingController();
   final _firestore = FirebaseFirestore.instance;
   final _auth = FirebaseAuth.instance;
 
   List<Map<String, dynamic>> _searchResults = [];
   List<Map<String, dynamic>> _contactMatches = [];
-  List<String> _friendIds = [];             // ← added this
+  List<String> _friendIds = [];
 
   bool _isSearching = false;
-  bool _isSyncingContacts = false;
   bool _hasSearched = false;
-
-  late TabController _tabController;
+  bool _isSyncingContacts = false;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
-    _loadFriendIds();                        // ← load on init
+    _loadFriendIds();
   }
 
   @override
   void dispose() {
     _searchController.dispose();
-    _tabController.dispose();
     super.dispose();
   }
 
-  // Load current user's friend IDs into local state
   Future<void> _loadFriendIds() async {
     final uid = _auth.currentUser?.uid;
     if (uid == null) return;
@@ -65,13 +61,10 @@ class _FriendsPageState extends State<FriendsPage>
     if (!mounted) return;
 
     setState(() {
-      _friendIds = (doc.exists ?? false)
-          ? List<String>.from(doc.data()?['friends'] ?? [])
-          : [];
+      _friendIds = List<String>.from(doc.data()?['friends'] ?? []);
     });
   }
 
-  // Search users by username
   Future<void> _searchByUsername(String query) async {
     if (query.trim().isEmpty) {
       if (!mounted) return;
@@ -109,33 +102,31 @@ class _FriendsPageState extends State<FriendsPage>
     });
   }
 
-  // Add friend
   Future<void> _addFriend(String friendUid) async {
     final currentUid = _auth.currentUser?.uid;
     if (currentUid == null) return;
 
-    await _firestore.collection('users').doc(currentUid).set({
-      'friends': FieldValue.arrayUnion([friendUid]),
-    }, SetOptions(merge: true));
-
-    await _firestore.collection('users').doc(friendUid).set({
-      'friends': FieldValue.arrayUnion([currentUid]),
-    }, SetOptions(merge: true));
+    await _firestore.collection('users').doc(currentUid).set(
+      {'friends': FieldValue.arrayUnion([friendUid])},
+      SetOptions(merge: true),
+    );
+    await _firestore.collection('users').doc(friendUid).set(
+      {'friends': FieldValue.arrayUnion([currentUid])},
+      SetOptions(merge: true),
+    );
 
     if (!mounted) return;
-    setState(() => _friendIds.add(friendUid));  // ← update local list
+    setState(() => _friendIds.add(friendUid));
 
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Friend added!')),
     );
   }
 
-  // Sync contacts
   Future<void> _syncContacts() async {
     if (!mounted) return;
-    setState(() => _isSyncingContacts = true);  // ← moved to top, fixed
+    setState(() => _isSyncingContacts = true);
 
-    // Check current permission status
     final status = await Permission.contacts.status;
 
     if (status.isPermanentlyDenied) {
@@ -165,19 +156,15 @@ class _FriendsPageState extends State<FriendsPage>
       }
     }
 
-    // Permission granted — fetch contacts
     try {
-      final contacts =
-          await FlutterContacts.getContacts(withProperties: true);
-
+      final contacts = await FlutterContacts.getContacts(withProperties: true);
       final phoneNumbers = await compute(_extractPhoneNumbers, contacts);
 
       if (phoneNumbers.isEmpty) {
         if (!mounted) return;
         setState(() => _isSyncingContacts = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content: Text('No phone numbers found in contacts')),
+          const SnackBar(content: Text('No phone numbers found in contacts')),
         );
         return;
       }
@@ -203,17 +190,15 @@ class _FriendsPageState extends State<FriendsPage>
 
       if (!mounted) return;
       setState(() {
-        _contactMatches = matches;          // ← sets matches correctly
+        _contactMatches = matches;
         _isSyncingContacts = false;
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(matches.isEmpty
-              ? 'No contacts found on UniHapps yet'
-              : '${matches.length} contact(s) found on UniHapps!'),
-        ),
-      );
+      if (matches.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No contacts found on UniHapps yet')),
+        );
+      }
     } catch (e) {
       if (!mounted) return;
       setState(() => _isSyncingContacts = false);
@@ -223,325 +208,278 @@ class _FriendsPageState extends State<FriendsPage>
     }
   }
 
+  List<Map<String, dynamic>> get _displayList =>
+      _hasSearched ? _searchResults : _contactMatches;
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F6FF),
-      appBar: AppBar(
-        backgroundColor: const Color(0xFFF8F6FF),
-        elevation: 0,
-        title: const Text(
-          'Friends',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 24,
-            color: Color(0xFF1A1A2E),
-          ),
-        ),
-        bottom: TabBar(
-          controller: _tabController,
-          labelColor: Colors.deepPurple,
-          unselectedLabelColor: Colors.grey,
-          indicatorColor: Colors.deepPurple,
-          tabs: const [
-            Tab(text: 'Find Friends'),
-            Tab(text: 'My Friends'),
+      backgroundColor: Colors.white,
+      body: SafeArea(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+              child: Row(
+                children: [
+                  GestureDetector(
+                    onTap: () => Navigator.pop(context),
+                    child: const Icon(
+                      Icons.arrow_back_ios_new_rounded,
+                      size: 20,
+                      color: Color(0xFF1A1A2E),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  const Text(
+                    'Add Friends',
+                    style: TextStyle(
+                      fontSize: 26,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF1A1A2E),
+                    ),
+                  ),
+                  const Spacer(),
+                  GestureDetector(
+                    onTap: _isSyncingContacts ? null : _syncContacts,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade100,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: _isSyncingContacts
+                          ? const SizedBox(
+                              width: 14,
+                              height: 14,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Text(
+                              'Link Contacts',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w500,
+                                color: Color(0xFF1A1A2E),
+                              ),
+                            ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // Search bar
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: TextField(
+                controller: _searchController,
+                onChanged: _searchByUsername,
+                decoration: InputDecoration(
+                  hintText: 'Search',
+                  hintStyle: TextStyle(color: Colors.grey.shade400),
+                  prefixIcon: Icon(
+                    Icons.search,
+                    color: Colors.grey.shade400,
+                    size: 20,
+                  ),
+                  filled: true,
+                  fillColor: Colors.grey.shade100,
+                  contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(30),
+                    borderSide: BorderSide.none,
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(30),
+                    borderSide: BorderSide.none,
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(30),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
+              ),
+            ),
+
+            // Body
+            Expanded(child: _buildBody()),
           ],
         ),
       ),
-      body: TabBarView(
-        controller: _tabController,
-        children: [
-          _buildFindFriendsTab(),
-          _buildMyFriendsTab(),
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: 0,
+        backgroundColor: Colors.white,
+        elevation: 8,
+        selectedItemColor: const Color(0xFF3DB54A),
+        unselectedItemColor: Colors.black,
+        onTap: (index) {
+          if (index == 1) {
+            Navigator.pushAndRemoveUntil(
+              context,
+              MaterialPageRoute(builder: (_) => const HomePage()),
+              (route) => false,
+            );
+          } else if (index == 2) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const ProfilePage()),
+            );
+          }
+        },
+        items: const [
+          BottomNavigationBarItem(
+            icon: Icon(Icons.people_outline),
+            activeIcon: Icon(Icons.people),
+            label: 'Friends',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.celebration_outlined),
+            activeIcon: Icon(Icons.celebration),
+            label: 'Happs',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.person_outline),
+            activeIcon: Icon(Icons.person),
+            label: 'Me',
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildFindFriendsTab() {
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.all(16),
-          child: TextField(
-            controller: _searchController,
-            onChanged: _searchByUsername,
-            decoration: InputDecoration(
-              hintText: 'Search by username...',
-              prefixIcon:
-                  const Icon(Icons.search, color: Colors.deepPurple),
-              suffixIcon: _searchController.text.isNotEmpty
-                  ? IconButton(
-                      icon: const Icon(Icons.clear),
-                      onPressed: () {
-                        _searchController.clear();
-                        _searchByUsername('');
-                      },
-                    )
-                  : null,
-              filled: true,
-              fillColor: Colors.white,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(16),
-                borderSide: BorderSide.none,
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(16),
-                borderSide: BorderSide.none,
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(16),
-                borderSide: const BorderSide(
-                    color: Colors.deepPurple, width: 1.5),
-              ),
-            ),
-          ),
-        ),
-
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: SizedBox(
-            width: double.infinity,
-            child: OutlinedButton.icon(
-              onPressed: _isSyncingContacts ? null : _syncContacts,
-              style: OutlinedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                side: const BorderSide(color: Colors.deepPurple),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
-                ),
-              ),
-              icon: _isSyncingContacts
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.contacts, color: Colors.deepPurple),
-              label: Text(
-                _isSyncingContacts ? 'Syncing...' : 'Sync Contacts',
-                style: const TextStyle(color: Colors.deepPurple),
-              ),
-            ),
-          ),
-        ),
-
-        const SizedBox(height: 16),
-        Expanded(child: _buildSearchResults()),
-      ],
-    );
-  }
-
-  Widget _buildSearchResults() {
+  Widget _buildBody() {
     if (_isSearching) {
       return const Center(child: CircularProgressIndicator());
     }
 
-    if (_hasSearched) {
-      if (_searchResults.isEmpty) {
-        return Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(Icons.person_search, size: 64, color: Colors.grey),
-              const SizedBox(height: 12),
-              Text(
-                'No users found for "${_searchController.text}"',
-                style: const TextStyle(color: Colors.grey),
-              ),
-            ],
-          ),
-        );
-      }
-
-      return ListView.builder(
-        itemCount: _searchResults.length,
-        itemBuilder: (context, index) => _buildUserTile(
-          _searchResults[index],
-          friendIds: _friendIds,   // ← passed correctly
+    if (_hasSearched && _searchResults.isEmpty) {
+      return Center(
+        child: Text(
+          'No users found',
+          style: TextStyle(color: Colors.grey.shade400, fontSize: 15),
         ),
       );
     }
 
-    // Contact matches shown after sync
-    if (_contactMatches.isNotEmpty) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+    if (_displayList.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+          child: Text(
+            _hasSearched ? 'Results' : 'You May Know',
+            style: const TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF1A1A2E),
+            ),
+          ),
+        ),
+        Expanded(
+          child: ListView.builder(
+            itemCount: _displayList.length,
+            itemBuilder: (context, index) =>
+                _buildUserTile(_displayList[index]),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildUserTile(Map<String, dynamic> user) {
+    final firstName = user['firstName'] ?? '';
+    final lastName = user['lastName'] ?? '';
+    final displayName = '$firstName $lastName'.trim();
+    final username = user['username'] ?? '';
+    final label =
+        displayName.isNotEmpty ? displayName : username;
+    final initials = label.isNotEmpty
+        ? label
+            .split(' ')
+            .where((String e) => e.isNotEmpty)
+            .map((String e) => e[0].toUpperCase())
+            .take(2)
+            .join()
+        : '?';
+    final alreadyFriend = _friendIds.contains(user['uid']);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      child: Row(
         children: [
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 16),
+          // Avatar
+          CircleAvatar(
+            radius: 26,
+            backgroundColor: Colors.deepPurple.shade100,
+            backgroundImage: user['photoURL'] != null
+                ? NetworkImage(user['photoURL'])
+                : null,
+            child: user['photoURL'] == null
+                ? Text(
+                    initials,
+                    style: const TextStyle(
+                      color: Colors.deepPurple,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  )
+                : null,
+          ),
+          const SizedBox(width: 14),
+
+          // Name
+          Expanded(
             child: Text(
-              'People you may know',
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 16,
+              label,
+              style: const TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
                 color: Color(0xFF1A1A2E),
               ),
             ),
           ),
-          const SizedBox(height: 8),
-          Expanded(
-            child: ListView.builder(
-              itemCount: _contactMatches.length,
-              itemBuilder: (context, index) => _buildUserTile(
-                _contactMatches[index],
-                friendIds: _friendIds,   // ← passed correctly
-              ),
-            ),
-          ),
-        ],
-      );
-    }
 
-    return const Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.group_add, size: 64, color: Colors.deepPurple),
-          SizedBox(height: 12),
-          Text(
-            'Search for friends by username\nor sync your contacts',
-            textAlign: TextAlign.center,
-            style: TextStyle(color: Colors.grey, fontSize: 15),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildMyFriendsTab() {
-    final uid = _auth.currentUser?.uid;
-    if (uid == null) return const SizedBox();
-
-    return StreamBuilder<DocumentSnapshot>(
-      stream: _firestore.collection('users').doc(uid).snapshots(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        }
-
-        final friendIds = (snapshot.data?.exists ?? false)
-            ? List<String>.from(snapshot.data?.get('friends') ?? [])
-            : <String>[];                    // ← null safe
-
-        if (friendIds.isEmpty) {
-          return const Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.people_outline, size: 64, color: Colors.grey),
-                SizedBox(height: 12),
-                Text(
-                  'No friends yet\nSearch to add some!',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.grey, fontSize: 15),
-                ),
-              ],
-            ),
-          );
-        }
-
-        return FutureBuilder<List<Map<String, dynamic>>>(
-          future: Future.wait(
-            friendIds.map((id) => _firestore
-                .collection('users')
-                .doc(id)
-                .get()
-                .then((doc) => {'uid': doc.id, ...?doc.data()})),
-          ),
-          builder: (context, friendsSnapshot) {
-            if (friendsSnapshot.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator());
-            }
-
-            final friends = friendsSnapshot.data ?? [];
-
-            return ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: friends.length,
-              itemBuilder: (context, index) =>
-                  _buildUserTile(friends[index], showAddButton: false),
-            );
-          },
-        );
-      },
-    );
-  }
-
-  Widget _buildUserTile(
-    Map<String, dynamic> user, {
-    bool showAddButton = true,
-    List<String> friendIds = const [],   // ← parameter added
-  }) {
-    final displayName =
-        '${user['firstName'] ?? ''} ${user['lastName'] ?? ''}'.trim();
-    final username = user['username'] ?? '';
-    final initials = displayName.isNotEmpty
-        ? displayName.split(' ').map((e) => e[0]).take(2).join()
-        : '?';
-    final alreadyFriend = friendIds.contains(user['uid']); // ← local check
-
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.deepPurple.withOpacity(0.06),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: ListTile(
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        leading: CircleAvatar(
-          radius: 24,
-          backgroundColor: Colors.deepPurple.shade100,
-          backgroundImage: user['photoURL'] != null
-              ? NetworkImage(user['photoURL'])
-              : null,
-          child: user['photoURL'] == null
+          // Request / Friends button
+          alreadyFriend
               ? Text(
-                  initials,
-                  style: const TextStyle(
-                    color: Colors.deepPurple,
-                    fontWeight: FontWeight.bold,
+                  'Friends',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Colors.grey.shade500,
+                    fontWeight: FontWeight.w500,
                   ),
                 )
-              : null,
-        ),
-        title: Text(
-          displayName.isNotEmpty ? displayName : username,
-          style: const TextStyle(fontWeight: FontWeight.w600),
-        ),
-        subtitle: Text(
-          '@$username',
-          style: const TextStyle(color: Colors.grey, fontSize: 13),
-        ),
-        trailing: showAddButton
-            ? alreadyFriend
-                ? const Chip(
-                    label: Text('Friends',
-                        style: TextStyle(color: Colors.deepPurple)),
-                    backgroundColor: Color(0xFFEDE7F6),
-                  )
-                : ElevatedButton(
-                    onPressed: () => _addFriend(user['uid']),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.deepPurple,
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
+              : GestureDetector(
+                  onTap: () => _addFriend(user['uid']),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.add_circle_outline,
+                        size: 20,
+                        color: Colors.grey.shade600,
                       ),
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                    ),
-                    child: const Text('Add'),
-                  )
-            : null,
+                      const SizedBox(width: 4),
+                      Text(
+                        'Request',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.grey.shade600,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+        ],
       ),
     );
   }

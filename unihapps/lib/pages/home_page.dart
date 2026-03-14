@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:location/location.dart';
+import 'friends_list.dart';
+import 'profile_page.dart';
 import '../repositories/user_repositories.dart';
 
 class HomePage extends StatefulWidget {
