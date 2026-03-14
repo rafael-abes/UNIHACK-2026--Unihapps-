@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../services/auth_services.dart';
 import 'phone_login.dart';
+import 'package:flutter/services.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import '../models/user_model.dart';
+import '../repositories/user_repositories.dart';
 
 class SignUpPage extends StatefulWidget {
   const SignUpPage({super.key});
@@ -12,6 +16,7 @@ class SignUpPage extends StatefulWidget {
 
 class _SignUpPageState extends State<SignUpPage> {
   final _formKey = GlobalKey<FormState>();
+  final UserRepository _userRepository = UserRepository();
   bool _obscurePassword = true;
   bool _isLoading = false;
 
@@ -38,12 +43,27 @@ class _SignUpPageState extends State<SignUpPage> {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _isLoading = true);
     try {
-      await _authService.signUpWithEmail(
+      final credential = await _authService.signUpWithEmail(
         email: _emailController.text.trim(),
         password: _passwordController.text,
         displayName:
             '${_firstNameController.text.trim()} ${_lastNameController.text.trim()}',
       );
+      final uid = credential.user?.uid;
+      if (uid != null) {
+        final user = UserModel(
+          id: uid,
+          firstName: _firstNameController.text.trim(),
+          lastName: _lastNameController.text.trim(),
+          username: _usernameController.text.trim(),
+          email: _emailController.text.trim(),
+          phone: '',
+          friends: [],
+          preferences: [],
+          schedule: {},
+        );
+        await _userRepository.createUser(user);
+      }
       // AuthWrapper stream handles navigation automatically
     } on FirebaseAuthException catch (e) {
       ScaffoldMessenger.of(
@@ -59,20 +79,6 @@ class _SignUpPageState extends State<SignUpPage> {
     setState(() => _isLoading = true);
     try {
       await _authService.signInWithGoogle();
-    } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(e.toString())));
-    } finally {
-      setState(() => _isLoading = false);
-    }
-  }
-
-  // Anonymous sign in
-  Future<void> _signInAnonymously() async {
-    setState(() => _isLoading = true);
-    try {
-      await _authService.signInAnonymously();
     } catch (e) {
       ScaffoldMessenger.of(
         context,
@@ -235,18 +241,6 @@ class _SignUpPageState extends State<SignUpPage> {
                       ),
                 icon: const Icon(Icons.phone),
                 label: const Text('Continue with Phone'),
-              ),
-            ),
-
-            const SizedBox(height: 12),
-
-            // ── Anonymous Sign In ──
-            SizedBox(
-              width: double.infinity,
-              child: TextButton.icon(
-                onPressed: _isLoading ? null : _signInAnonymously,
-                icon: const Icon(Icons.person_outline),
-                label: const Text('Continue as Guest'),
               ),
             ),
           ],

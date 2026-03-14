@@ -1,8 +1,11 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import '../models/user_model.dart';
+import '../repositories/user_repositories.dart';
 
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
+  final UserRepository _userRepository = UserRepository();
 
   // Email & Password Sign Up
   Future<UserCredential> signUpWithEmail({
@@ -30,13 +33,25 @@ class AuthService {
       accessToken: googleAuth.accessToken,
       idToken: googleAuth.idToken,
     );
+    final result = await _auth.signInWithCredential(credential);
 
-    return await _auth.signInWithCredential(credential);
-  }
+    // Create Firestore doc using repository — only if new user
+    if (result.additionalUserInfo?.isNewUser == true) {
+      final user = UserModel(
+        id: result.user!.uid,
+        firstName: result.user?.displayName?.split(' ').first ?? '',
+        lastName: result.user?.displayName?.split(' ').last ?? '',
+        username: '',
+        email: result.user?.email ?? '',
+        phone: '',
+        friends: [],
+        preferences: [],
+        schedule: {}
+      );
+      await _userRepository.createUser(user);
+    }
 
-  // Anonymous Sign In
-  Future<UserCredential> signInAnonymously() async {
-    return await _auth.signInAnonymously();
+    return result;
   }
 
   // Sign Out
