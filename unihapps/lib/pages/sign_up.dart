@@ -174,13 +174,21 @@ class _SignUpPageState extends State<SignUpPage> {
     });
   }
 
-  /// Converts the local schedule state into Map<String, List<String>> for the model.
-  /// Each time block becomes a "HH:MM-HH:MM" string.
+  static const Map<String, String> _dayAbbreviations = {
+    'Monday': 'mon',
+    'Tuesday': 'tues',
+    'Wednesday': 'wed',
+    'Thursday': 'thurs',
+    'Friday': 'fri',
+  };
+
   Map<String, List<String>> get _scheduleForModel {
     return _schedule.map(
       (day, blocks) => MapEntry(
-        day.toLowerCase(),
-        blocks.map((b) => '${b['start']}-${b['end']}').toList(),
+        _dayAbbreviations[day]!,
+        blocks
+            .map((b) => '{"start": "${b['start']}", "end": "${b['end']}"}')
+            .toList(),
       ),
     );
   }
@@ -210,8 +218,8 @@ class _SignUpPageState extends State<SignUpPage> {
           email: _emailController.text.trim(),
           phone: '',
           friends: [],
-          preferences: [],
-          schedule: {},
+          preferences: _selectedPreferences.toList(),
+          schedule: _scheduleForModel,
         );
         await _userRepository.createUser(user);
       }
