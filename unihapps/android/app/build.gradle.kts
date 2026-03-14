@@ -17,7 +17,7 @@ if (localPropertiesFile.exists()) {
     localPropertiesFile.reader().use { reader ->
         localProperties.load(reader)
     }
-} 
+}
 
 android {
     namespace = "com.example.unihapps"

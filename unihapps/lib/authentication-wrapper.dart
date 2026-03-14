@@ -30,7 +30,7 @@ class AuthWrapper extends StatelessWidget {
 
         // logged out
         if (!snapshot.hasData) {
-          return const WelcomePage();
+          return const HomePage();
         }
 
         // logged in — pass uid to HomePage if needed
