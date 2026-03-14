@@ -10,6 +10,7 @@ class UserModel {
   final List<String> friends;
   final List<String> preferences;
   final Map<String, List<String>> schedule;
+  final String fcmToken;
 
   UserModel({
     required this.id,
@@ -21,6 +22,7 @@ class UserModel {
     required this.friends,
     required this.preferences,
     required this.schedule,
+    required this.fcmToken,
   });
 
   factory UserModel.fromMap(String id, Map<String, dynamic> map) {
@@ -38,6 +40,7 @@ class UserModel {
             (key, value) => MapEntry(key, List<String>.from(value)),
           ) ??
           {},
+          fcmToken: map['fcmToken'] as String? ?? '',
     );
   }
 
@@ -51,6 +54,7 @@ class UserModel {
       'friends': friends,
       'preferences': preferences,
       'schedule': schedule,
+      'fcmToken': fcmToken, // ← add this
     };
   }
 }
