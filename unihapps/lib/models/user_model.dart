@@ -7,6 +7,7 @@ class UserModel {
   final String username;
   final String email;
   final List<String> preferences;
+  final List<String> friendsList;
   final Map<String, List<String>> schedule;
 
   UserModel({
@@ -16,6 +17,7 @@ class UserModel {
     required this.username,
     required this.email,
     required this.preferences,
+    required this.friendsList,
     required this.schedule,
   });
 
@@ -27,6 +29,7 @@ class UserModel {
       username: map['username'] as String? ?? '',
       email: map['email'] as String? ?? '',
       preferences: List<String>.from(map['preferences'] ?? []),
+      friendsList: List<String>.from(map['friendsList'] ?? []),
       schedule: (map['schedule'] as Map<String, dynamic>?)?.map(
             (key, value) => MapEntry(
               key,
@@ -44,6 +47,7 @@ class UserModel {
       'username': username,
       'email': email,
       'preferences': preferences,
+      'friendsList': friendsList,
       'schedule': schedule,
     };
   }
