@@ -1,5 +1,7 @@
 import 'dart:convert';
 
+import 'package:flutter/scheduler.dart';
+
 class UserModel {
   final String id;
   final String firstName;
@@ -10,6 +12,7 @@ class UserModel {
   final List<String> friends;
   final List<String> preferences;
   final Map<String, List<String>> schedule;
+  final String status;
   final String fcmToken;
 
   UserModel({
@@ -22,6 +25,7 @@ class UserModel {
     required this.friends,
     required this.preferences,
     required this.schedule,
+    this.status = 'offline',
     required this.fcmToken,
   });
 
@@ -40,6 +44,7 @@ class UserModel {
             (key, value) => MapEntry(key, List<String>.from(value)),
           ) ??
           {},
+          status: map['status'] as String? ?? 'offline',
           fcmToken: map['fcmToken'] as String? ?? '',
     );
   }
@@ -54,6 +59,7 @@ class UserModel {
       'friends': friends,
       'preferences': preferences,
       'schedule': schedule,
+      'status': status,
       'fcmToken': fcmToken, // ← add this
     };
   }
