@@ -1,5 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:unihapps/pages/home_page.dart';
 import 'pages/welcome.dart';
 // import 'pages/home_page.dart';
 
@@ -27,12 +28,12 @@ class AuthWrapper extends StatelessWidget {
 
         // logged out
         if (!snapshot.hasData) {
-          return const WelcomePage();
+          return const HomePage();
         }
 
         // logged in — pass uid to HomePage if needed
         final user = snapshot.data!;
-        return WelcomePage();
+        return HomePage();
       },
     );
   }
