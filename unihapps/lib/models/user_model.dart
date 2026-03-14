@@ -9,7 +9,6 @@ class UserModel {
   final String phone;
   final List<String> friends;
   final List<String> preferences;
-  final List<String> friendsList;
   final Map<String, List<String>> schedule;
 
   UserModel({
@@ -21,7 +20,6 @@ class UserModel {
     required this.phone,
     required this.friends,
     required this.preferences,
-    required this.friendsList,
     required this.schedule,
   });
 
@@ -52,7 +50,6 @@ class UserModel {
       'phone': phone,
       'friends': friends,
       'preferences': preferences,
-      'friendsList': friendsList,
       'schedule': schedule,
     };
   }
