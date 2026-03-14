@@ -26,5 +26,8 @@ class UserRepository {
     return List<String>.from(data["friendsList"] ?? []);
   }
 
+  Future<void> updateUserStatus(String userId, String status) async {
+    await _firestore.users.doc(userId).update({'status': status});
+  }
 
 }
