@@ -243,7 +243,7 @@ class _GroupsPageState extends State<GroupsPage> {
                 onTap: () => Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (_) => GroupDetailPage(group: group),
+                    builder: (_) => GroupDetailPage(groupId: group.id),
                   ),
                 ),
                 child: Container(
