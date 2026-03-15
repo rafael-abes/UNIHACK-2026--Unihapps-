@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../services/phone_auth.dart';
 import 'home_page.dart';
+import 'onboarding.dart';
 
 class OTPPage extends StatefulWidget {
   final String verificationId;
@@ -36,7 +37,7 @@ class _OTPPageState extends State<OTPPage> {
       if (!mounted) return;
       Navigator.pushAndRemoveUntil(
         context,
-        MaterialPageRoute(builder: (_) => const HomePage()),
+        MaterialPageRoute(builder: (_) => const OnboardingPage()),
         (route) => false,
       );
 
