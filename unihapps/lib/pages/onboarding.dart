@@ -11,11 +11,7 @@ class OnboardingPage extends StatefulWidget {
   final String? prefillDisplayName; // from Google sign in
   final String? prefillEmail;
 
-  const OnboardingPage({
-    super.key,
-    this.prefillDisplayName,
-    this.prefillEmail,
-  });
+  const OnboardingPage({super.key, this.prefillDisplayName, this.prefillEmail});
 
   @override
   State<OnboardingPage> createState() => _OnboardingPageState();
@@ -36,22 +32,40 @@ class _OnboardingPageState extends State<OnboardingPage> {
 
   // Preferences
   static const List<String> _availablePreferences = [
-    'Food', 'Study', 'Sports', 'Music', 'Art',
-    'Gaming', 'Travel', 'Fitness', 'Tech', 'Social',
+    'Food',
+    'Study',
+    'Sports',
+    'Music',
+    'Art',
+    'Gaming',
+    'Travel',
+    'Fitness',
+    'Tech',
+    'Social',
   ];
   final Set<String> _selectedPreferences = {};
 
   // Schedule
   static const List<String> _weekdays = [
-    'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday',
+    'Monday',
+    'Tuesday',
+    'Wednesday',
+    'Thursday',
+    'Friday',
   ];
   static const Map<String, String> _dayAbbreviations = {
-    'Monday': 'mon', 'Tuesday': 'tues', 'Wednesday': 'wed',
-    'Thursday': 'thurs', 'Friday': 'fri',
+    'Monday': 'mon',
+    'Tuesday': 'tues',
+    'Wednesday': 'wed',
+    'Thursday': 'thurs',
+    'Friday': 'fri',
   };
   final Map<String, List<Map<String, String>>> _schedule = {
-    'Monday': [], 'Tuesday': [], 'Wednesday': [],
-    'Thursday': [], 'Friday': [],
+    'Monday': [],
+    'Tuesday': [],
+    'Wednesday': [],
+    'Thursday': [],
+    'Friday': [],
   };
 
   @override
@@ -82,8 +96,9 @@ class _OnboardingPageState extends State<OnboardingPage> {
     return _schedule.map(
       (day, blocks) => MapEntry(
         _dayAbbreviations[day]!,
-        blocks.map((b) =>
-            '{"start": "${b['start']}", "end": "${b['end']}"}').toList(),
+        blocks
+            .map((b) => '{"start": "${b['start']}", "end": "${b['end']}"}')
+            .toList(),
       ),
     );
   }
@@ -108,11 +123,15 @@ class _OnboardingPageState extends State<OnboardingPage> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Start',
-                        style: TextStyle(fontSize: 12, color: Colors.grey)),
+                    const Text(
+                      'Start',
+                      style: TextStyle(fontSize: 12, color: Colors.grey),
+                    ),
                     const SizedBox(height: 4),
                     _TimeInputRow(
-                        hourCtrl: startHourCtrl, minCtrl: startMinCtrl),
+                      hourCtrl: startHourCtrl,
+                      minCtrl: startMinCtrl,
+                    ),
                   ],
                 ),
               ),
@@ -122,11 +141,12 @@ class _OnboardingPageState extends State<OnboardingPage> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('End',
-                        style: TextStyle(fontSize: 12, color: Colors.grey)),
+                    const Text(
+                      'End',
+                      style: TextStyle(fontSize: 12, color: Colors.grey),
+                    ),
                     const SizedBox(height: 4),
-                    _TimeInputRow(
-                        hourCtrl: endHourCtrl, minCtrl: endMinCtrl),
+                    _TimeInputRow(hourCtrl: endHourCtrl, minCtrl: endMinCtrl),
                   ],
                 ),
               ),
@@ -160,8 +180,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
     if (endH * 60 + endM <= startH * 60 + startM) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content: Text('End time must be after start time')),
+          const SnackBar(content: Text('End time must be after start time')),
         );
       }
       return;
@@ -207,7 +226,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
         preferences: _selectedPreferences.toList(),
         schedule: _scheduleForModel,
         status: 'offline',
-        fcmToken: token
+        fcmToken: token,
       );
 
       await _userRepo.createUser(userModel);
@@ -220,9 +239,9 @@ class _OnboardingPageState extends State<OnboardingPage> {
       );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error saving profile: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error saving profile: $e')));
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -240,8 +259,8 @@ class _OnboardingPageState extends State<OnboardingPage> {
           _currentStep == 0
               ? 'Your Profile'
               : _currentStep == 1
-                  ? 'Your Interests'
-                  : 'Your Availability',
+              ? 'Your Interests'
+              : 'Your Availability',
           style: const TextStyle(
             fontWeight: FontWeight.bold,
             color: Color(0xFF1A1A2E),
@@ -290,18 +309,18 @@ class _OnboardingPageState extends State<OnboardingPage> {
                 if (_currentStep > 0)
                   Expanded(
                     child: OutlinedButton(
-                      onPressed: () =>
-                          setState(() => _currentStep--),
+                      onPressed: () => setState(() => _currentStep--),
                       style: OutlinedButton.styleFrom(
-                        padding:
-                            const EdgeInsets.symmetric(vertical: 16),
+                        padding: const EdgeInsets.symmetric(vertical: 16),
                         side: const BorderSide(color: Colors.deepPurple),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(14),
                         ),
                       ),
-                      child: const Text('Back',
-                          style: TextStyle(color: Colors.deepPurple)),
+                      child: const Text(
+                        'Back',
+                        style: TextStyle(color: Colors.deepPurple),
+                      ),
                     ),
                   ),
                 if (_currentStep > 0) const SizedBox(width: 12),
@@ -394,8 +413,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
             decoration: _inputDecoration('Last Name'),
             textCapitalization: TextCapitalization.words,
             validator: (v) {
-              if (v == null || v.trim().isEmpty)
-                return 'Last name is required';
+              if (v == null || v.trim().isEmpty) return 'Last name is required';
               if (v.trim().length < 2) return 'Must be at least 2 characters';
               return null;
             },
@@ -405,8 +423,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
             controller: _usernameController,
             decoration: _inputDecoration('Username'),
             validator: (v) {
-              if (v == null || v.trim().isEmpty)
-                return 'Username is required';
+              if (v == null || v.trim().isEmpty) return 'Username is required';
               if (v.trim().length < 3) return 'Must be at least 3 characters';
               if (!RegExp(r'^[a-zA-Z0-9_]+$').hasMatch(v.trim()))
                 return 'Only letters, numbers, and underscores';
@@ -464,7 +481,9 @@ class _OnboardingPageState extends State<OnboardingPage> {
           Text(
             '${_selectedPreferences.length} selected',
             style: const TextStyle(
-                color: Colors.deepPurple, fontWeight: FontWeight.w600),
+              color: Colors.deepPurple,
+              fontWeight: FontWeight.w600,
+            ),
           ),
         ],
       ],
@@ -517,8 +536,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(14),
-        borderSide:
-            const BorderSide(color: Color(0xFF5C35C9), width: 1.5),
+        borderSide: const BorderSide(color: Color(0xFF5C35C9), width: 1.5),
       ),
       errorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(14),
@@ -559,8 +577,7 @@ class _TimeInputRow extends StatelessWidget {
         ),
         const Padding(
           padding: EdgeInsets.symmetric(horizontal: 4),
-          child: Text(':',
-              style: TextStyle(fontWeight: FontWeight.bold)),
+          child: Text(':', style: TextStyle(fontWeight: FontWeight.bold)),
         ),
         Expanded(
           child: TextFormField(
@@ -608,12 +625,16 @@ class _DayScheduleTile extends StatelessWidget {
           children: [
             SizedBox(
               width: 100,
-              child: Text(day,
-                  style: const TextStyle(fontWeight: FontWeight.w500)),
+              child: Text(
+                day,
+                style: const TextStyle(fontWeight: FontWeight.w500),
+              ),
             ),
             if (blocks.isEmpty)
-              const Text('No blocks',
-                  style: TextStyle(color: Colors.grey, fontSize: 13)),
+              const Text(
+                'No blocks',
+                style: TextStyle(color: Colors.grey, fontSize: 13),
+              ),
             ...blocks.asMap().entries.map(
               (entry) => Padding(
                 padding: const EdgeInsets.only(right: 6),
