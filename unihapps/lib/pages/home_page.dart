@@ -66,6 +66,34 @@ class _HomePageState extends State<HomePage> {
 
   BitmapDescriptor profileIcon = BitmapDescriptor.defaultMarker;
 
+  /// ===============================
+  /// CAMPUS GEOFENCE POLYGON
+  /// ===============================
+
+  final List<LatLng> campusBoundary = [
+    const LatLng(-37.90777268374264, 145.13021258121205), // top left
+    const LatLng(-37.90830783929267, 145.1366105888795),  // top right
+    const LatLng(-37.91522197879005, 145.1341950163024),  // bottom right
+    const LatLng(-37.91358788712169, 145.12876989249247), // bottom left
+  ];
+
+  bool isInsideCampus(LatLng point) {
+    int intersectCount = 0;
+    for (int j = 0; j < campusBoundary.length; j++) {
+      LatLng v1 = campusBoundary[j];
+      LatLng v2 = campusBoundary[(j + 1) % campusBoundary.length];
+      if (((v1.longitude > point.longitude) != (v2.longitude > point.longitude)) &&
+          (point.latitude <
+              (v2.latitude - v1.latitude) *
+                      (point.longitude - v1.longitude) /
+                      (v2.longitude - v1.longitude) +
+                  v1.latitude)) {
+        intersectCount++;
+      }
+    }
+    return (intersectCount % 2) == 1;
+  }
+
   void initializeUser() {
     final user = FirebaseAuth.instance.currentUser;
 
@@ -100,11 +128,20 @@ class _HomePageState extends State<HomePage> {
         final loc = await _location.getLocation();
 
         if (loc.latitude != null && loc.longitude != null) {
-          await _userRepository.updateUserLocation(
-            userId!,
-            loc.latitude!,
-            loc.longitude!,
-          );
+          final position = LatLng(loc.latitude!, loc.longitude!);
+
+          if (isInsideCampus(position)) {
+            await _userRepository.updateUserLocation(
+              userId!,
+              loc.latitude!,
+              loc.longitude!,
+            );
+          } else {
+            // Outside campus — remove location so friends can't see you
+            await _firestore.collection('users').doc(userId).update({
+              'location': FieldValue.delete(),
+            });
+          }
         }
       },
     );
@@ -195,6 +232,8 @@ class _HomePageState extends State<HomePage> {
           GeoPoint geo = friend.location!;
           LatLng pos = LatLng(geo.latitude, geo.longitude);
 
+          if (!isInsideCampus(pos)) continue;
+
           friendMarkers.add(
             Marker(
               markerId: MarkerId(friend.id),
@@ -266,6 +305,15 @@ class _HomePageState extends State<HomePage> {
                 zoom: 14.5,
               ),
               markers: _markers,
+              polygons: {
+                Polygon(
+                  polygonId: const PolygonId("campus"),
+                  points: campusBoundary,
+                  strokeWidth: 3,
+                  strokeColor: Colors.deepPurple,
+                  fillColor: Colors.deepPurple.withOpacity(0.1),
+                ),
+              },
             ),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: 1,
