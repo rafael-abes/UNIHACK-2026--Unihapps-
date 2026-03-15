@@ -1,4 +1,6 @@
 import 'dart:convert';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/scheduler.dart';
 
 class UserModel {
   final String id;
@@ -8,9 +10,13 @@ class UserModel {
   final String email;
   final String phone;
   final List<String> friends;
+  final List<String> friendRequests;
+  final List<String> sentRequests;
   final List<String> preferences;
   final Map<String, List<String>> schedule;
+  final String status;
   final String fcmToken;
+  final GeoPoint? location;
 
   UserModel({
     required this.id,
@@ -22,7 +28,11 @@ class UserModel {
     required this.friends,
     required this.preferences,
     required this.schedule,
+    this.status = 'offline',
     required this.fcmToken,
+    this.location,
+    required this.friendRequests,
+    required this.sentRequests,
   });
 
   factory UserModel.fromMap(String id, Map<String, dynamic> map) {
@@ -35,12 +45,16 @@ class UserModel {
       phone: map['phone'] as String? ?? '',
       friends: List<String>.from(map['friends'] ?? []),
       preferences: List<String>.from(map['preferences'] ?? []),
+      friendRequests: List<String>.from(map['friendRequests'] ?? []),
+      sentRequests: List<String>.from(map['sentRequests'] ?? []),
       schedule:
           (map['schedule'] as Map<String, dynamic>?)?.map(
             (key, value) => MapEntry(key, List<String>.from(value)),
           ) ??
           {},
+          status: map['status'] as String? ?? 'offline',
           fcmToken: map['fcmToken'] as String? ?? '',
+          location: map['location']?['coords'],
     );
   }
 
@@ -53,8 +67,18 @@ class UserModel {
       'phone': phone,
       'friends': friends,
       'preferences': preferences,
+      'friendRequests': friendRequests,
+      'sentRequests': sentRequests,
       'schedule': schedule,
-      'fcmToken': fcmToken, // ← add this
+      'status': status,
+      'fcmToken': fcmToken, 
+      'location': location != null
+          ? {
+              'coords': location,
+              'updatedAt': FieldValue.serverTimestamp(),
+            }
+          : null
+      // ← add this
     };
   }
 }

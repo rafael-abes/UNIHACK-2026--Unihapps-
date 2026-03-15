@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
@@ -10,6 +9,12 @@ import '../models/happs_model.dart';
 import '../repositories/happs_repositories.dart';
 import 'friends_list.dart';
 import 'profile_page.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'group_detail.dart';
+import 'group_list.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import '../repositories/user_repositories.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers
@@ -36,7 +41,56 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   final Completer<GoogleMapController> _googleMapController = Completer();
   final Location _location = Location();
+  final _firestore = FirebaseFirestore.instance;
+  final _auth = FirebaseAuth.instance;
+
   LocationData? locationData;
+
+  StreamSubscription? _friendsSubscription;
+
+  Timer? _locationTimer;
+
+  Set<Marker> _markers = {};
+
+  final UserRepository _userRepository = UserRepository();
+  // final String userId = 'exampleUserId'; // Replace with actual user ID
+  String? userId;
+
+  final List<String> statuses = ['offline', 'free', 'busy', 'in-class'];
+  final Map<String, Color> statusColors = {
+    'offline': Colors.grey,
+    'free': Colors.green,
+    'busy': Colors.red,
+    'in-class': Colors.blue,
+  };
+  String currentStatus = 'offline';
+
+  void initializeUser() {
+    final user = FirebaseAuth.instance.currentUser;
+
+    if (user != null) {
+      userId = user.uid;
+    } else {
+      print("No user logged in");
+    }
+  }
+
+  void startLocationUpdates() {
+  _locationTimer = Timer.periodic(
+    const Duration(seconds: 30),
+    (timer) async {
+      final loc = await _location.getLocation();
+
+      if (loc.latitude != null && loc.longitude != null) {
+        await _userRepository.updateUserLocation(
+          userId!,
+          loc.latitude!,
+          loc.longitude!,
+        );
+      }
+    },
+  );
+}
 
   void getCurrentLocation() async {
     try {
@@ -47,9 +101,7 @@ class _HomePageState extends State<HomePage> {
       );
 
       LocationData currentLocationData = await _location.getLocation();
-      setState(() {
-        locationData = currentLocationData;
-      });
+      setState(() => locationData = currentLocationData);
 
       final GoogleMapController controller =
           await _googleMapController.future;
@@ -58,7 +110,9 @@ class _HomePageState extends State<HomePage> {
         CameraUpdate.newCameraPosition(
           CameraPosition(
             target: LatLng(
-                currentLocationData.latitude!, currentLocationData.longitude!),
+              currentLocationData.latitude!,
+              currentLocationData.longitude!,
+            ),
             zoom: 14.5,
           ),
         ),
@@ -69,13 +123,27 @@ class _HomePageState extends State<HomePage> {
           CameraUpdate.newCameraPosition(
             CameraPosition(
               target: LatLng(
-                  newLocationData.latitude!, newLocationData.longitude!),
+                newLocationData.latitude!,
+                newLocationData.longitude!,
+              ),
               zoom: 14.5,
             ),
           ),
         );
         setState(() {
           locationData = newLocationData;
+
+          _markers.removeWhere((m) => m.markerId.value == "me");
+          _markers.add(
+            Marker(
+              markerId: const MarkerId("me"),
+              position: LatLng(
+                newLocationData.latitude!,
+                newLocationData.longitude!,
+              ),
+              infoWindow: const InfoWindow(title: "You"),
+            ),
+          );
         });
       });
     } catch (e) {
@@ -83,13 +151,80 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+  Future<void> _setStatus(String newStatus) async {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) return;
+
+    setState(() => currentStatus = newStatus);
+
+    if (userId != null) {
+      await _userRepository.updateUserStatus(userId!, newStatus);
+    }
+  }
+
+  Future<void> listenToFriends() async {
+    if (userId == null) return;
+
+    List<String> friendIds = await _userRepository.getFriends(userId!);
+
+    if (friendIds.isEmpty) return;
+
+    _friendsSubscription =
+        _userRepository.streamFriendsLocations(friendIds).listen((friends) {
+      Set<Marker> friendMarkers = {};
+
+      for (var friend in friends) {
+        if (friend.location != null) {
+          GeoPoint geo = friend.location!;
+          LatLng pos = LatLng(geo.latitude, geo.longitude);
+
+          friendMarkers.add(
+            Marker(
+              markerId: MarkerId(friend.id),
+              position: pos,
+              infoWindow: InfoWindow(title: friend.username),
+            ),
+          );
+        }
+      }
+
+      setState(() {
+        _markers.removeWhere((m) => m.markerId.value != "me");
+        _markers.addAll(friendMarkers);
+      });
+    });
+  }
+
   @override
   void initState() {
     super.initState();
+    initializeUser();
     getCurrentLocation();
+    listenToFriends();
+    startLocationUpdates();
+  }
+
+  Future<void> _loadCurrentStatus() async {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) return;
+    final doc = await _firestore.collection('users').doc(uid).get();
+    if (!mounted) return;
+    setState(() {
+      currentStatus = doc.data()?['status'] ?? 'offline';
+    });
+  }
+
+  void _showFriendsSheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => _FriendsBottomSheet(),
+    );
   }
 
   void _showHappsSheet() {
+    print('[HAPPS] _showHappsSheet called — locationData: $locationData');
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -108,26 +243,18 @@ class _HomePageState extends State<HomePage> {
                   _googleMapController.complete(controller),
               initialCameraPosition: CameraPosition(
                 target: LatLng(
-                    locationData!.latitude!, locationData!.longitude!),
+                  locationData!.latitude!,
+                  locationData!.longitude!,
+                ),
                 zoom: 14.5,
               ),
-              markers: {
-                if (locationData != null)
-                  Marker(
-                    markerId: const MarkerId('currentLocation'),
-                    position: LatLng(
-                        locationData!.latitude!, locationData!.longitude!),
-                  ),
-              },
+              markers: _markers,
             ),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: 1,
         onTap: (index) {
           if (index == 0) {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const FriendsPage()),
-            );
+            _showFriendsSheet();
           } else if (index == 1) {
             _showHappsSheet();
           } else if (index == 2) {
@@ -144,14 +271,526 @@ class _HomePageState extends State<HomePage> {
             label: 'Friends',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.celebration_outlined),
-            activeIcon: Icon(Icons.celebration),
-            label: 'Happs',
+            icon: Icon(Icons.home_outlined),
+            activeIcon: Icon(Icons.home),
+            label: 'Home',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.person_outline),
             activeIcon: Icon(Icons.person),
-            label: 'Me',
+            label: 'Profile',
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FriendsBottomSheet extends StatefulWidget {
+  @override
+  State<_FriendsBottomSheet> createState() => _FriendsBottomSheetState();
+}
+
+class _FriendsBottomSheetState extends State<_FriendsBottomSheet>
+    with SingleTickerProviderStateMixin {
+  final _firestore = FirebaseFirestore.instance;
+  final _auth = FirebaseAuth.instance;
+  late TabController _tabController;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 2, vsync: this);
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  void _showAddOptions() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 40,
+              height: 4,
+              margin: const EdgeInsets.only(bottom: 20),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade300,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const Text(
+              'Add',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF1A1A2E),
+              ),
+            ),
+            const SizedBox(height: 16),
+            GestureDetector(
+              onTap: () {
+                Navigator.pop(ctx);
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const FriendsPage()),
+                );
+              },
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                margin: const EdgeInsets.only(bottom: 12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8F6FF),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: Colors.deepPurple.withOpacity(0.2)),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.deepPurple.shade100,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(
+                        Icons.person_add,
+                        color: Colors.deepPurple,
+                        size: 24,
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Add Friend',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 16,
+                              color: Color(0xFF1A1A2E),
+                            ),
+                          ),
+                          SizedBox(height: 2),
+                          Text(
+                            'Search by username or sync contacts',
+                            style: TextStyle(color: Colors.grey, fontSize: 13),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Icon(Icons.chevron_right, color: Colors.grey),
+                  ],
+                ),
+              ),
+            ),
+            GestureDetector(
+              onTap: () {
+                Navigator.pop(ctx);
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const GroupsPage()),
+                );
+              },
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                margin: const EdgeInsets.only(bottom: 12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF0F7FF),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: Colors.blue.withOpacity(0.2)),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.shade100,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(
+                        Icons.group_add,
+                        color: Colors.blue,
+                        size: 24,
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'New Group',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 16,
+                              color: Color(0xFF1A1A2E),
+                            ),
+                          ),
+                          SizedBox(height: 2),
+                          Text(
+                            'Create a group with your friends',
+                            style: TextStyle(color: Colors.grey, fontSize: 13),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Icon(Icons.chevron_right, color: Colors.grey),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final uid = _auth.currentUser?.uid;
+
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.55,
+      decoration: const BoxDecoration(
+        color: Color(0xFFF8F6FF),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      child: Column(
+        children: [
+          Container(
+            width: 40,
+            height: 4,
+            margin: const EdgeInsets.only(top: 12, bottom: 8),
+            decoration: BoxDecoration(
+              color: Colors.grey.shade300,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'Friends',
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF1A1A2E),
+                  ),
+                ),
+                GestureDetector(
+                  onTap: _showAddOptions,
+                  child: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.deepPurple.shade50,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(
+                      Icons.add,
+                      color: Colors.deepPurple,
+                      size: 22,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          TabBar(
+            controller: _tabController,
+            labelColor: Colors.deepPurple,
+            unselectedLabelColor: Colors.grey,
+            indicatorColor: Colors.deepPurple,
+            tabs: const [
+              Tab(text: 'People'),
+              Tab(text: 'Groups'),
+            ],
+          ),
+          Expanded(
+            child: TabBarView(
+              controller: _tabController,
+              children: [
+                // People tab
+                uid == null
+                    ? const SizedBox()
+                    : StreamBuilder<DocumentSnapshot>(
+                        stream: _firestore
+                            .collection('users')
+                            .doc(uid)
+                            .snapshots(),
+                        builder: (context, snapshot) {
+                          final friendIds = (snapshot.data?.exists ?? false)
+                              ? List<String>.from(
+                                  (snapshot.data?.data()
+                                          as Map<
+                                            String,
+                                            dynamic
+                                          >?)?['friends'] ??
+                                      [],
+                                )
+                              : <String>[];
+
+                          if (friendIds.isEmpty) {
+                            return Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  const Icon(
+                                    Icons.people_outline,
+                                    size: 48,
+                                    color: Colors.grey,
+                                  ),
+                                  const SizedBox(height: 8),
+                                  const Text(
+                                    'No friends yet',
+                                    style: TextStyle(
+                                      color: Colors.grey,
+                                      fontSize: 15,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 12),
+                                  TextButton(
+                                    onPressed: () {
+                                      Navigator.pop(context);
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) => const FriendsPage(),
+                                        ),
+                                      );
+                                    },
+                                    child: const Text('Add Friends'),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }
+
+                          return FutureBuilder<List<Map<String, dynamic>>>(
+                            future: Future.wait(
+                              friendIds.map(
+                                (id) => _firestore
+                                    .collection('users')
+                                    .doc(id)
+                                    .get()
+                                    .then(
+                                      (doc) => {'uid': doc.id, ...?doc.data()},
+                                    ),
+                              ),
+                            ),
+                            builder: (context, friendsSnap) {
+                              if (!friendsSnap.hasData) {
+                                return const Center(
+                                  child: CircularProgressIndicator(),
+                                );
+                              }
+
+                              return ListView.builder(
+                                padding: const EdgeInsets.all(12),
+                                itemCount: friendsSnap.data!.length,
+                                itemBuilder: (context, index) {
+                                  final friend = friendsSnap.data![index];
+                                  final displayName =
+                                      '${friend['firstName'] ?? ''} ${friend['lastName'] ?? ''}'
+                                          .trim();
+                                  final username = friend['username'] ?? '';
+                                  final initials = displayName.isNotEmpty
+                                      ? displayName
+                                            .split(' ')
+                                            .map((e) => e[0])
+                                            .take(2)
+                                            .join()
+                                      : '?';
+
+                                  return Container(
+                                    margin: const EdgeInsets.only(bottom: 8),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      borderRadius: BorderRadius.circular(14),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.deepPurple.withOpacity(
+                                            0.04,
+                                          ),
+                                          blurRadius: 8,
+                                          offset: const Offset(0, 2),
+                                        ),
+                                      ],
+                                    ),
+                                    child: ListTile(
+                                      leading: CircleAvatar(
+                                        backgroundColor:
+                                            Colors.deepPurple.shade100,
+                                        child: Text(
+                                          initials,
+                                          style: const TextStyle(
+                                            color: Colors.deepPurple,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ),
+                                      title: Text(
+                                        displayName.isNotEmpty
+                                            ? displayName
+                                            : username,
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                      subtitle: Text(
+                                        '@$username',
+                                        style: const TextStyle(
+                                          color: Colors.grey,
+                                          fontSize: 13,
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                },
+                              );
+                            },
+                          );
+                        },
+                      ),
+
+                // Groups tab
+                uid == null
+                    ? const SizedBox()
+                    : StreamBuilder<QuerySnapshot>(
+                        stream: _firestore
+                            .collection('groups')
+                            .where('members', arrayContains: uid)
+                            .snapshots(),
+                        builder: (context, snapshot) {
+                          final groups = snapshot.data?.docs ?? [];
+
+                          if (groups.isEmpty) {
+                            return Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  const Icon(
+                                    Icons.group_outlined,
+                                    size: 48,
+                                    color: Colors.grey,
+                                  ),
+                                  const SizedBox(height: 8),
+                                  const Text(
+                                    'No groups yet',
+                                    style: TextStyle(
+                                      color: Colors.grey,
+                                      fontSize: 15,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 12),
+                                  TextButton(
+                                    onPressed: () {
+                                      Navigator.pop(context);
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) => const GroupsPage(),
+                                        ),
+                                      );
+                                    },
+                                    child: const Text('Create Group'),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }
+
+                          return ListView.builder(
+                            padding: const EdgeInsets.all(12),
+                            itemCount: groups.length,
+                            itemBuilder: (context, index) {
+                              final data =
+                                  groups[index].data() as Map<String, dynamic>;
+                              final name = data['name'] as String? ?? '';
+                              final memberCount =
+                                  (data['members'] as List?)?.length ?? 0;
+
+                              return Container(
+                                margin: const EdgeInsets.only(bottom: 8),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(14),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.deepPurple.withOpacity(
+                                        0.04,
+                                      ),
+                                      blurRadius: 8,
+                                      offset: const Offset(0, 2),
+                                    ),
+                                  ],
+                                ),
+                                child: ListTile(
+                                  leading: CircleAvatar(
+                                    backgroundColor: Colors.blue.shade100,
+                                    child: Text(
+                                      name.isNotEmpty
+                                          ? name[0].toUpperCase()
+                                          : '?',
+                                      style: const TextStyle(
+                                        color: Colors.blue,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                  title: Text(
+                                    name,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  subtitle: Text(
+                                    '$memberCount member${memberCount != 1 ? 's' : ''}',
+                                    style: const TextStyle(
+                                      color: Colors.grey,
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                                  trailing: const Icon(
+                                    Icons.chevron_right,
+                                    color: Colors.grey,
+                                  ),
+                                  onTap: () {
+                                    Navigator.pop(context);
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) => GroupDetailPage(
+                                          groupId: groups[index].id,
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                ),
+                              );
+                            },
+                          );
+                        },
+                      ),
+              ],
+            ),
           ),
         ],
       ),
@@ -183,14 +822,20 @@ class _HappsSheetState extends State<_HappsSheet> {
   }
 
   Future<void> _joinHapp(HappsModel happ) async {
+    print('[HAPPS] _joinHapp called — happId: ${happ.id}, title: ${happ.title}');
     final uid = _auth.currentUser?.uid;
-    if (uid == null) return;
+    if (uid == null) {
+      print('[HAPPS] _joinHapp aborted — no current user');
+      return;
+    }
     try {
       final userRef = _firestore.doc('users/$uid');
       await _repo.updateHapp(happ.id, {
         'participants': FieldValue.arrayUnion([userRef]),
       });
+      print('[HAPPS] _joinHapp success — uid: $uid joined happ: ${happ.id}');
     } catch (e) {
+      print('[HAPPS] _joinHapp ERROR: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Could not join: $e')),
@@ -200,6 +845,7 @@ class _HappsSheetState extends State<_HappsSheet> {
   }
 
   void _openAddHapp() {
+    print('[HAPPS] _openAddHapp called — locationData: ${widget.locationData}');
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -293,26 +939,44 @@ class _HappsSheetState extends State<_HappsSheet> {
               child: StreamBuilder<QuerySnapshot>(
                 stream: _firestore.collection('happs').snapshots(),
                 builder: (context, snapshot) {
+                  print('[HAPPS] StreamBuilder state: ${snapshot.connectionState}, hasError: ${snapshot.hasError}, docCount: ${snapshot.data?.docs.length}');
+                  if (snapshot.hasError) {
+                    print('[HAPPS] StreamBuilder ERROR: ${snapshot.error}\n${snapshot.stackTrace}');
+                  }
                   if (snapshot.connectionState == ConnectionState.waiting) {
                     return const Center(child: CircularProgressIndicator());
                   }
 
                   final docs = snapshot.data?.docs ?? [];
+                  print('[HAPPS] Loaded ${docs.length} happs docs, uid: $uid');
 
                   final myHapps = docs
                       .where((d) =>
                           _getOrganizerId(d.data() as Map<String, dynamic>) ==
                           uid)
-                      .map((d) => HappsModel.fromMap(
-                          d.id, d.data() as Map<String, dynamic>))
+                      .map((d) {
+                        try {
+                          return HappsModel.fromMap(d.id, d.data() as Map<String, dynamic>);
+                        } catch (e) {
+                          print('[HAPPS] fromMap ERROR on doc ${d.id}: $e — data: ${d.data()}');
+                          rethrow;
+                        }
+                      })
                       .toList();
                   final nearbyHapps = docs
                       .where((d) =>
                           _getOrganizerId(d.data() as Map<String, dynamic>) !=
                           uid)
-                      .map((d) => HappsModel.fromMap(
-                          d.id, d.data() as Map<String, dynamic>))
+                      .map((d) {
+                        try {
+                          return HappsModel.fromMap(d.id, d.data() as Map<String, dynamic>);
+                        } catch (e) {
+                          print('[HAPPS] fromMap ERROR on doc ${d.id}: $e — data: ${d.data()}');
+                          rethrow;
+                        }
+                      })
                       .toList();
+                  print('[HAPPS] myHapps: ${myHapps.length}, nearbyHapps: ${nearbyHapps.length}');
 
                   return ListView(
                     controller: controller,
@@ -501,16 +1165,25 @@ class _NearbyHappTileState extends State<_NearbyHappTile> {
   }
 
   Future<void> _fetchOrganizer() async {
-    final doc = await FirebaseFirestore.instance
-        .collection('users')
-        .doc(widget.happ.organizerId)
-        .get();
-    if (!mounted) return;
-    final data = doc.data();
-    if (data != null) {
-      final name =
-          '${data['firstName'] ?? ''} ${data['lastName'] ?? ''}'.trim();
-      setState(() => _organizerName = name.isNotEmpty ? name : 'Unknown');
+    print('[HAPPS] _fetchOrganizer called — organizerId: ${widget.happ.organizerId}, happId: ${widget.happ.id}');
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(widget.happ.organizerId)
+          .get();
+      if (!mounted) return;
+      final data = doc.data();
+      if (data != null) {
+        final name =
+            '${data['firstName'] ?? ''} ${data['lastName'] ?? ''}'.trim();
+        final resolved = name.isNotEmpty ? name : 'Unknown';
+        print('[HAPPS] _fetchOrganizer resolved name: $resolved');
+        setState(() => _organizerName = resolved);
+      } else {
+        print('[HAPPS] _fetchOrganizer — doc exists: ${doc.exists}, data was null for id: ${widget.happ.organizerId}');
+      }
+    } catch (e, st) {
+      print('[HAPPS] _fetchOrganizer ERROR: $e\n$st');
     }
   }
 
@@ -723,7 +1396,9 @@ class _AddHappSheetState extends State<_AddHappSheet> {
   }
 
   Future<void> _submit() async {
+    print('[HAPPS] _submit called — title: "${_titleController.text.trim()}", category: $_selectedCategory, time: ${_selectedTime.format(context)}');
     if (_titleController.text.trim().isEmpty) {
+      print('[HAPPS] _submit aborted — empty title');
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please enter a title')),
       );
@@ -731,7 +1406,11 @@ class _AddHappSheetState extends State<_AddHappSheet> {
     }
 
     final uid = _auth.currentUser?.uid;
-    if (uid == null) return;
+    if (uid == null) {
+      print('[HAPPS] _submit aborted — no current user');
+      return;
+    }
+    print('[HAPPS] _submit uid: $uid');
 
     setState(() => _isSubmitting = true);
 
@@ -750,6 +1429,7 @@ class _AddHappSheetState extends State<_AddHappSheet> {
             widget.locationData!.longitude!,
           )
         : const GeoPoint(0, 0);
+    print('[HAPPS] _submit geoPoint: $geoPoint, when: $when, locationData was ${widget.locationData == null ? "null" : "present"}');
 
     final happ = HappsModel(
       id: '',
@@ -765,15 +1445,18 @@ class _AddHappSheetState extends State<_AddHappSheet> {
       ...happ.toMap(),
       'locationName': _locationController.text.trim(),
     };
+    print('[HAPPS] _submit writing to Firestore — fields: ${extraFields.keys.toList()}');
 
     try {
-      await FirebaseFirestore.instance.collection('happs').add(extraFields);
+      final ref = await FirebaseFirestore.instance.collection('happs').add(extraFields);
+      print('[HAPPS] _submit success — new doc id: ${ref.id}');
       if (!mounted) return;
       Navigator.pop(context);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Happ created!')),
       );
-    } catch (e) {
+    } catch (e, st) {
+      print('[HAPPS] _submit ERROR: $e\n$st');
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error: $e')),

@@ -8,8 +8,6 @@ class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final UserRepository _userRepository = UserRepository();
 
-  
-
   // Email & Password Sign Up
   Future<UserCredential> signUpWithEmail({
     required String email,
@@ -36,28 +34,9 @@ class AuthService {
       accessToken: googleAuth.accessToken,
       idToken: googleAuth.idToken,
     );
-    final result = await _auth.signInWithCredential(credential);
 
-    // Create Firestore doc using repository — only if new user
-   if (result.additionalUserInfo?.isNewUser == true) {
-  final token = await FirebaseMessaging.instance.getToken() ?? '';
-  
-  final user = UserModel(
-    id: result.user!.uid,
-    firstName: result.user?.displayName?.split(' ').first ?? '',
-    lastName: result.user?.displayName?.split(' ').last ?? '',
-    username: '',
-    email: result.user?.email ?? '',
-    phone: '',
-    friends: [],
-    preferences: [],
-    schedule: {},
-    fcmToken: token, // ← add this
-  );
-  await _userRepository.createUser(user);
-}
-
-    return result;
+    return await _auth.signInWithCredential(credential);
+    // Don't create Firestore doc here — OnboardingPage handles it
   }
 
   // Sign Out
