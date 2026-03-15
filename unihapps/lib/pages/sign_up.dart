@@ -225,6 +225,7 @@ class _SignUpPageState extends State<SignUpPage> {
           sentRequests: [],
           preferences: _selectedPreferences.toList(),
           schedule: _scheduleForModel,
+          status: 'offline',
           fcmToken: token, // ← add this
         );
         await _userRepository.createUser(user);

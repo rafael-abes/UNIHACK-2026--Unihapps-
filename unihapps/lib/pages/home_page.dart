@@ -8,6 +8,7 @@ import 'profile_page.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'group_detail.dart';
 import 'group_list.dart';
+import '../repositories/user_repositories.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -23,6 +24,19 @@ class _HomePageState extends State<HomePage> {
   final _auth = FirebaseAuth.instance;
 
   LocationData? locationData;
+
+  final UserRepository _userRepository = UserRepository();
+  final String userId = 'exampleUserId'; // Replace with actual user ID
+
+  final List<String> statuses = ['offline', 'free', 'busy', 'in-class'];
+  final Map<String, Color> statusColors = {
+  'offline': Colors.grey,
+  'free': Colors.green,
+  'busy': Colors.red,
+  'in-class': Colors.blue,
+  };
+
+  String currentStatus = 'offline';//Default status
 
   void getCurrentLocation() async {
     try {
@@ -73,6 +87,18 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+    Future<void> setStatus(String newStatus) async {
+    setState(() {
+      currentStatus = newStatus;
+    });
+
+    try {
+      await _userRepository.updateUserStatus(userId, newStatus);
+    } catch (e) {
+      print('Error updating status: $e');
+    }
+  }
+ 
   @override
   void initState() {
     super.initState();
@@ -131,16 +157,48 @@ class _HomePageState extends State<HomePage> {
             icon: Icon(Icons.people_outline),
             activeIcon: Icon(Icons.people),
             label: 'Friends',
+      appBar: AppBar(
+        title: const Text('Home'),
+        backgroundColor: statusColors[currentStatus] ?? Colors.grey,
+      ),
+      body: Column(
+        children: [
+
+          Padding(
+            padding: const EdgeInsets.all(10),
+            child: SegmentedButton<String>(
+              segments: const [
+                ButtonSegment(value: 'offline', label: Text('Offline')),
+                ButtonSegment(value: 'free', label: Text('Free')),
+                ButtonSegment(value: 'busy', label: Text('Busy')),
+                ButtonSegment(value: 'in-class', label: Text('In-class')),
+              ],
+              selected: {currentStatus},
+              onSelectionChanged: (newSelection) {
+                setStatus(newSelection.first);
+              },
+            ),
           ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.celebration_outlined),
-            activeIcon: Icon(Icons.celebration),
-            label: 'Happs',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.person_outline),
-            activeIcon: Icon(Icons.person),
-            label: 'Me',
+
+          Expanded(
+            child: locationData == null
+                ? const Center(child: CircularProgressIndicator())
+                : GoogleMap(
+                    onMapCreated: (controller) =>
+                        _googleMapController.complete(controller),
+                    initialCameraPosition: CameraPosition(
+                      target: LatLng(
+                          locationData!.latitude!, locationData!.longitude!),
+                      zoom: 14.5,
+                    ),
+                    markers: {
+                      Marker(
+                        markerId: const MarkerId('currentLocation'),
+                        position: LatLng(
+                            locationData!.latitude!, locationData!.longitude!),
+                      ),
+                    },
+                  ),
           ),
         ],
       ),
