@@ -17,6 +17,26 @@ class _HomePageState extends State<HomePage> {
   final Location _location = Location();
   LocationData? locationData;
 
+  BitmapDescriptor profileIcon = BitmapDescriptor.defaultMarker;
+
+  void setCustomIcon() async {
+    try {
+      final iconsResult = await Future.wait([
+        BitmapDescriptor.fromAssetImage(
+        const ImageConfiguration(size: Size(15, 15)),
+        'unihapps/assets/profilepicture.png',
+    )
+      ]);
+
+      setState(() {
+        profileIcon = iconsResult[0];
+      });
+
+    } catch (e) {
+      print('Error loading custom icon: $e');
+    }
+  }
+
   void getCurrentLocation() async {
     try {
 
