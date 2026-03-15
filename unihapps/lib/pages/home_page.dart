@@ -53,7 +53,6 @@ class _HomePageState extends State<HomePage> {
   Set<Marker> _markers = {};
 
   final UserRepository _userRepository = UserRepository();
-  // final String userId = 'exampleUserId'; // Replace with actual user ID
   String? userId;
 
   final List<String> statuses = ['offline', 'free', 'busy', 'in-class'];
@@ -65,6 +64,8 @@ class _HomePageState extends State<HomePage> {
   };
   String currentStatus = 'offline';
 
+  BitmapDescriptor profileIcon = BitmapDescriptor.defaultMarker;
+
   void initializeUser() {
     final user = FirebaseAuth.instance.currentUser;
 
@@ -75,23 +76,39 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+  void setCustomIcon() async {
+    try {
+      final iconsResult = await Future.wait([
+        BitmapDescriptor.fromAssetImage(
+          const ImageConfiguration(size: Size(15, 15)),
+          'unihapps/assets/profilepicture.png',
+        )
+      ]);
+
+      setState(() {
+        profileIcon = iconsResult[0];
+      });
+    } catch (e) {
+      print('Error loading custom icon: $e');
+    }
+  }
+
   void startLocationUpdates() {
-  _locationTimer = Timer.periodic(
-    const Duration(seconds: 30),
-    (timer) async {
-      final loc = await _location.getLocation();
+    _locationTimer = Timer.periodic(
+      const Duration(seconds: 30),
+      (timer) async {
+        final loc = await _location.getLocation();
 
-      if (loc.latitude != null && loc.longitude != null) {
-        await _userRepository.updateUserLocation(
-          userId!,
-          loc.latitude!,
-          loc.longitude!,
-        );
-      }
-    },
-  );
-}
-
+        if (loc.latitude != null && loc.longitude != null) {
+          await _userRepository.updateUserLocation(
+            userId!,
+            loc.latitude!,
+            loc.longitude!,
+          );
+        }
+      },
+    );
+  }
   void getCurrentLocation() async {
     try {
       await _location.changeSettings(
