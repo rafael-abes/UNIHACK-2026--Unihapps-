@@ -1,8 +1,13 @@
 ## How to run the Happs app
 1. Pull files
-2. Using Emulator of choice, run a virtual device
-3. Run main.dart in debug
-
+2. Using Emulator of choice, run a virtual device (Can use Android Studio, etc.) (Warning: if web based emulator used, then not all functions of the app will be available for usage such as sync contacts)
+3. Run in terminal
+   ```cd unihapps```
+   ```flutter clean```
+   ```flutter pub get```
+4. Run ```main.dart``` in debug
+5. The flutter app should pop up automatically
+6. Now you can demo Happs!
 ## Inspiration
 University campuses are full of people, yet it can still feel surprisingly hard to organise spontaneous activities. It is almost **impossible** to memorise all your friends' schedules, and even then there is no way to know if or where they are on campus. Students often want to do simple things like grab food, play badminton, or start a quick study session, but coordinating it through group chats is inefficient and often results in crickets. 🦗 🦗
 
