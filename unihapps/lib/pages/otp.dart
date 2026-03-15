@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/phone_auth.dart';
 import 'home_page.dart';
 import 'onboarding.dart';
@@ -34,20 +35,55 @@ class _OTPPageState extends State<OTPPage> {
         verificationId: widget.verificationId,
         otpCode: otp,
       );
+
       if (!mounted) return;
+
+      // Check UID exists and if onboarding is complete
+      final uid = FirebaseAuth.instance.currentUser?.uid;
+
+      if (uid == null) {
+        setState(() => isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Authentication failed, please try again'),
+          ),
+        );
+        return;
+      }
+
+      // Check Firestore for existing user document
+      final doc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid)
+          .get();
+
+      final hasUsername =
+          doc.exists && (doc.data()?['username'] ?? '').isNotEmpty;
+
+      if (!mounted) return;
+
+      // Existing user → HomePage, new user → OnboardingPage
       Navigator.pushAndRemoveUntil(
         context,
-        MaterialPageRoute(builder: (_) => const OnboardingPage()),
+        MaterialPageRoute(
+          builder: (_) =>
+              hasUsername ? const HomePage() : const OnboardingPage(),
+        ),
         (route) => false,
       );
-
-      // AuthWrapper stream detects login and navigates automatically
     } on FirebaseAuthException catch (e) {
+      if (!mounted) return;
       setState(() => isLoading = false);
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text(e.message ?? 'Invalid OTP')));
     }
+  }
+
+  @override
+  void dispose() {
+    otpController.dispose();
+    super.dispose();
   }
 
   @override
