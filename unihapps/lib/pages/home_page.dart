@@ -8,6 +8,9 @@ import 'profile_page.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'group_detail.dart';
 import 'group_list.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import '../repositories/user_repositories.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -24,7 +27,16 @@ class _HomePageState extends State<HomePage> {
 
   LocationData? locationData;
 
-  // Status
+  StreamSubscription? _friendsSubscription;
+
+  Timer? _locationTimer;
+
+  Set<Marker> _markers = {};
+
+  final UserRepository _userRepository = UserRepository();
+  // final String userId = 'exampleUserId'; // Replace with actual user ID
+  String? userId;
+
   final List<String> statuses = ['offline', 'free', 'busy', 'in-class'];
   final Map<String, Color> statusColors = {
     'offline': Colors.grey,
@@ -33,6 +45,33 @@ class _HomePageState extends State<HomePage> {
     'in-class': Colors.blue,
   };
   String currentStatus = 'offline';
+
+  void initializeUser() {
+    final user = FirebaseAuth.instance.currentUser;
+
+    if (user != null) {
+      userId = user.uid;
+    } else {
+      print("No user logged in");
+    }
+  }
+
+  void startLocationUpdates() {
+  _locationTimer = Timer.periodic(
+    const Duration(seconds: 30),
+    (timer) async {
+      final loc = await _location.getLocation();
+
+      if (loc.latitude != null && loc.longitude != null) {
+        await _userRepository.updateUserLocation(
+          userId!,
+          loc.latitude!,
+          loc.longitude!,
+        );
+      }
+    },
+  );
+}
 
   void getCurrentLocation() async {
     try {
@@ -71,10 +110,35 @@ class _HomePageState extends State<HomePage> {
             ),
           ),
         );
-        setState(() => locationData = newLocationData);
-      });
-    } catch (e) {
-      debugPrint('Error getting location: $e');
+
+        setState(() {
+          locationData = newLocationData;
+
+          _markers.removeWhere((m) => m.markerId.value == "me");
+          _markers.add(
+            Marker(
+              markerId: const MarkerId("me"),
+              position: LatLng(
+                newLocationData.latitude!,
+                newLocationData.longitude!,
+              ),
+              infoWindow: const InfoWindow(title: "You"),
+            ),
+          );
+        });
+
+         // STORE LOCATION IN FIRESTORE
+          // if (userId != null) {
+          //   await _userRepository.updateUserLocation(
+          //     userId!,
+          //     newLocationData.latitude!,
+          //     newLocationData.longitude!,
+          //   );
+          // }
+        });
+    }
+    catch (e) {
+      print('Error getting location: $e');
     }
   }
 
@@ -84,20 +148,49 @@ class _HomePageState extends State<HomePage> {
 
     setState(() => currentStatus = newStatus);
 
-    try {
-      await _firestore.collection('users').doc(uid).set({
-        'status': newStatus,
-      }, SetOptions(merge: true));
-    } catch (e) {
-      debugPrint('Error updating status: $e');
+    if (userId != null) {
+      await _userRepository.updateUserStatus(userId!, newStatus);
     }
+  }
+
+  Future<void> listenToFriends() async {
+    if (userId == null) return;
+
+    List<String> friendIds = await _userRepository.getFriends(userId!);
+
+    if (friendIds.isEmpty) return;
+
+    _friendsSubscription =
+        _userRepository.streamFriendsLocations(friendIds).listen((friends) {
+      Set<Marker> friendMarkers = {};
+
+      for (var friend in friends) {
+        if (friend.location != null) {
+          GeoPoint geo = friend.location!;
+          LatLng pos = LatLng(geo.latitude, geo.longitude);
+
+          friendMarkers.add(
+            Marker(
+              markerId: MarkerId(friend.id),
+              position: pos,
+              infoWindow: InfoWindow(title: friend.username),
+            ),
+          );
+        }
+      }
+
+      setState(() {
+        _markers.removeWhere((m) => m.markerId.value != "me");
+        _markers.addAll(friendMarkers);
+      });
+    });
   }
 
   @override
   void initState() {
     super.initState();
+    initializeUser();
     getCurrentLocation();
-    _loadCurrentStatus();
   }
 
   Future<void> _loadCurrentStatus() async {
@@ -157,15 +250,7 @@ class _HomePageState extends State<HomePage> {
                       ),
                       zoom: 14.5,
                     ),
-                    markers: {
-                      Marker(
-                        markerId: const MarkerId('currentLocation'),
-                        position: LatLng(
-                          locationData!.latitude!,
-                          locationData!.longitude!,
-                        ),
-                      ),
-                    },
+                    markers: _markers,
                   ),
           ),
         ],

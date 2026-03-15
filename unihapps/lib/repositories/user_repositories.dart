@@ -17,6 +17,15 @@ class UserRepository {
     return UserModel.fromMap(doc.id, doc.data() as Map<String, dynamic>);
   }
 
+  Future<List<String>> getFriends(String uid) async {
+    final doc = await _firestore.users.doc(uid).get();
+
+    if (!doc.exists) return [];
+
+    final data = doc.data() as Map<String, dynamic>;
+    return List<String>.from(data["friends"] ?? []);
+  }
+
   // Send a friend request
   Future<void> sendFriendRequest(String currentUid, String targetUid) async {
     // Add to current user's sentRequests
@@ -75,4 +84,24 @@ class UserRepository {
   Future<void> updateUserStatus(String userId, String status) async {
     await _firestore.users.doc(userId).update({'status': status});
   }
+
+  Future<void> updateUserLocation(String userId, double lat, double lng) async {
+      await FirebaseFirestore.instance.collection('users').doc(userId).update({
+        "location.coords": GeoPoint(lat, lng),
+        "location.updatedAt": FieldValue.serverTimestamp(),
+      });
+    }
+
+  Stream<List<UserModel>> streamFriendsLocations(List<String> friendIds) {
+    return FirebaseFirestore.instance
+        .collection('users')
+        .where(FieldPath.documentId, whereIn: friendIds)
+        .snapshots()
+        .map((snapshot) {
+      return snapshot.docs
+          .map((doc) => UserModel.fromMap(doc.id, doc.data()))
+          .toList();
+    });
+  }
+
 }
