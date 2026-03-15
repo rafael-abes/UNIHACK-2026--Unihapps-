@@ -1,5 +1,5 @@
 import 'dart:convert';
-
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/scheduler.dart';
 
 class UserModel {
@@ -14,6 +14,7 @@ class UserModel {
   final Map<String, List<String>> schedule;
   final String status;
   final String fcmToken;
+  final GeoPoint? location;
 
   UserModel({
     required this.id,
@@ -27,6 +28,7 @@ class UserModel {
     required this.schedule,
     this.status = 'offline',
     required this.fcmToken,
+    this.location,
   });
 
   factory UserModel.fromMap(String id, Map<String, dynamic> map) {
@@ -46,6 +48,7 @@ class UserModel {
           {},
           status: map['status'] as String? ?? 'offline',
           fcmToken: map['fcmToken'] as String? ?? '',
+          location: map['location']?['coords'],
     );
   }
 
@@ -60,7 +63,14 @@ class UserModel {
       'preferences': preferences,
       'schedule': schedule,
       'status': status,
-      'fcmToken': fcmToken, // ← add this
+      'fcmToken': fcmToken, 
+      'location': location != null
+          ? {
+              'coords': location,
+              'updatedAt': FieldValue.serverTimestamp(),
+            }
+          : null
+      // ← add this
     };
   }
 }

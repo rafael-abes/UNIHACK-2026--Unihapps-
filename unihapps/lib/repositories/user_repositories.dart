@@ -23,11 +23,30 @@ class UserRepository {
     if (!doc.exists) return [];
 
     final data = doc.data() as Map<String, dynamic>;
-    return List<String>.from(data["friendsList"] ?? []);
+    return List<String>.from(data["friends"] ?? []);
   }
 
   Future<void> updateUserStatus(String userId, String status) async {
     await _firestore.users.doc(userId).update({'status': status});
+  }
+
+  Future<void> updateUserLocation(String userId, double lat, double lng) async {
+      await FirebaseFirestore.instance.collection('users').doc(userId).update({
+        "location.coords": GeoPoint(lat, lng),
+        "location.updatedAt": FieldValue.serverTimestamp(),
+      });
+    }
+
+  Stream<List<UserModel>> streamFriendsLocations(List<String> friendIds) {
+    return FirebaseFirestore.instance
+        .collection('users')
+        .where(FieldPath.documentId, whereIn: friendIds)
+        .snapshots()
+        .map((snapshot) {
+      return snapshot.docs
+          .map((doc) => UserModel.fromMap(doc.id, doc.data()))
+          .toList();
+    });
   }
 
 }

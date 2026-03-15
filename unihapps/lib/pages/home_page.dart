@@ -6,6 +6,8 @@ import 'package:location/location.dart';
 import 'friends_list.dart';
 import 'profile_page.dart';
 import '../repositories/user_repositories.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -20,8 +22,15 @@ class _HomePageState extends State<HomePage> {
   final Location _location = Location();
   LocationData? locationData;
 
+  StreamSubscription? _friendsSubscription;
+
+  Timer? _locationTimer;
+
+  Set<Marker> _markers = {};
+
   final UserRepository _userRepository = UserRepository();
-  final String userId = 'exampleUserId'; // Replace with actual user ID
+  // final String userId = 'exampleUserId'; // Replace with actual user ID
+  String? userId;
 
   final List<String> statuses = ['offline', 'free', 'busy', 'in-class'];
   final Map<String, Color> statusColors = {
@@ -32,6 +41,33 @@ class _HomePageState extends State<HomePage> {
   };
 
   String currentStatus = 'offline';//Default status
+
+  void initializeUser() {
+    final user = FirebaseAuth.instance.currentUser;
+
+    if (user != null) {
+      userId = user.uid;
+    } else {
+      print("No user logged in");
+    }
+  }
+
+  void startLocationUpdates() {
+  _locationTimer = Timer.periodic(
+    const Duration(seconds: 30),
+    (timer) async {
+      final loc = await _location.getLocation();
+
+      if (loc.latitude != null && loc.longitude != null) {
+        await _userRepository.updateUserLocation(
+          userId!,
+          loc.latitude!,
+          loc.longitude!,
+        );
+      }
+    },
+  );
+}
 
   void getCurrentLocation() async {
     try {
@@ -58,8 +94,7 @@ class _HomePageState extends State<HomePage> {
         ),
       );
 
-      _location.onLocationChanged.listen((LocationData newLocationData) async{
-        
+      _location.onLocationChanged.listen((LocationData newLocationData) async {
         controller.animateCamera(
           CameraUpdate.newCameraPosition(
             CameraPosition(
@@ -71,9 +106,29 @@ class _HomePageState extends State<HomePage> {
 
         setState(() {
           locationData = newLocationData;
+
+          _markers.removeWhere((m) => m.markerId.value == "me");
+          _markers.add(
+            Marker(
+              markerId: const MarkerId("me"),
+              position: LatLng(
+                newLocationData.latitude!,
+                newLocationData.longitude!,
+              ),
+              infoWindow: const InfoWindow(title: "You"),
+            ),
+          );
         });
 
-      });
+         // STORE LOCATION IN FIRESTORE
+          // if (userId != null) {
+          //   await _userRepository.updateUserLocation(
+          //     userId!,
+          //     newLocationData.latitude!,
+          //     newLocationData.longitude!,
+          //   );
+          // }
+        });
     }
     catch (e) {
       print('Error getting location: $e');
@@ -85,18 +140,60 @@ class _HomePageState extends State<HomePage> {
       currentStatus = newStatus;
     });
 
-    try {
-      await _userRepository.updateUserStatus(userId, newStatus);
-    } catch (e) {
-      print('Error updating status: $e');
+    if (userId != null) {
+      await _userRepository.updateUserStatus(userId!, newStatus);
     }
+  }
+
+  Future<void> listenToFriends() async {
+    if (userId == null) return;
+
+    List<String> friendIds = await _userRepository.getFriends(userId!);
+
+    if (friendIds.isEmpty) return;
+
+    _friendsSubscription =
+        _userRepository.streamFriendsLocations(friendIds).listen((friends) {
+      Set<Marker> friendMarkers = {};
+
+      for (var friend in friends) {
+        if (friend.location != null) {
+          GeoPoint geo = friend.location!;
+          LatLng pos = LatLng(geo.latitude, geo.longitude);
+
+          friendMarkers.add(
+            Marker(
+              markerId: MarkerId(friend.id),
+              position: pos,
+              infoWindow: InfoWindow(title: friend.username),
+            ),
+          );
+        }
+      }
+
+      setState(() {
+        _markers.removeWhere((m) => m.markerId.value != "me");
+        _markers.addAll(friendMarkers);
+      });
+    });
   }
  
   @override
   void initState() {
     super.initState();
+    initializeUser();
     getCurrentLocation();
+    listenToFriends();
+    startLocationUpdates();
   }
+
+  @override
+  void dispose() {
+    _locationTimer?.cancel();
+    _friendsSubscription?.cancel();
+    super.dispose();
+  }
+
 
   
   @override
@@ -136,14 +233,41 @@ class _HomePageState extends State<HomePage> {
                           locationData!.latitude!, locationData!.longitude!),
                       zoom: 14.5,
                     ),
-                    markers: {
-                      Marker(
-                        markerId: const MarkerId('currentLocation'),
-                        position: LatLng(
-                            locationData!.latitude!, locationData!.longitude!),
-                      ),
-                    },
+                    markers: _markers,
                   ),
+          ),
+        ],
+      ),
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: 0,
+        backgroundColor: Colors.white,
+        elevation: 8,
+        selectedItemColor: const Color(0xFF3DB54A),
+        unselectedItemColor: Colors.black,
+        onTap: (index) {
+          if (index == 1) {
+            Navigator.pushAndRemoveUntil(
+              context,
+              MaterialPageRoute(builder: (_) => const FriendsPage()),
+              (route) => false,
+            );
+          } else if (index == 2) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const ProfilePage()),
+            );
+          }
+        },
+        items: const [
+          BottomNavigationBarItem(
+            icon: Icon(Icons.people_outline),
+            activeIcon: Icon(Icons.people),
+            label: 'Friends',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.person_outline),
+            activeIcon: Icon(Icons.person),
+            label: 'Me',
           ),
         ],
       ),
