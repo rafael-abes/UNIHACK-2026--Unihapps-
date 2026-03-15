@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:io';
 import '../services/profile_pic_service.dart';
+import 'preferences.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -467,7 +468,12 @@ class _ProfilePageState extends State<ProfilePage> {
                     _buildMenuItem(
                       icon: Icons.edit_outlined,
                       label: 'Preferences',
-                      onTap: () {},
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const PreferencesPage(),
+                        ),
+                      ),
                     ),
                     const SizedBox(height: 12),
                     _buildMenuItem(
