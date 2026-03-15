@@ -26,7 +26,7 @@ class HappsModel {
       title: map['title'] as String? ?? '',
       when: (map['when'] as Timestamp?)?.toDate() ?? DateTime.now(),
       category: map['category'] as String? ?? '',
-      location: map['location'] as GeoPoint? ?? GeoPoint(0, 0),
+      location: map['where'] as GeoPoint? ?? GeoPoint(0, 0),
       participants: List<String>.from(map['participants'] ?? []),
     );
   }
@@ -37,7 +37,7 @@ class HappsModel {
       'title': title,
       'when': Timestamp.fromDate(when),
       'category': category,
-      'location': location,
+      'where': location,
       'participants': participants,
     };
   }

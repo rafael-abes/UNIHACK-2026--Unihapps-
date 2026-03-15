@@ -15,4 +15,13 @@ class HappRepository {
   Future<void> updateHapp(String happId, Map<String, dynamic> data) async {
     await _firestore.happs.doc(happId).update(data);
   }
+
+  Future<List<HappsModel>> getHappsForUser(String userId) async {
+  final snapshot = await _firestore.happs
+      .where('participants', arrayContains: userId)
+      .get();
+  return snapshot.docs
+      .map((doc) => HappsModel.fromMap(doc.id, doc.data() as Map<String, dynamic>))
+      .toList();
+}
 }
