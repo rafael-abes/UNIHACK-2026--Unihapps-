@@ -273,7 +273,7 @@ class _HomePageState extends State<HomePage> {
           BottomNavigationBarItem(
             icon: Icon(Icons.home_outlined),
             activeIcon: Icon(Icons.home),
-            label: 'Home',
+            label: 'Happs',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.person_outline),
