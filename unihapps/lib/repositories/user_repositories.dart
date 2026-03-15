@@ -17,17 +17,61 @@ class UserRepository {
     return UserModel.fromMap(doc.id, doc.data() as Map<String, dynamic>);
   }
 
-  Future<List<String>> getFriends(String uid) async {
-    final doc = await _firestore.users.doc(uid).get();
+  // Send a friend request
+  Future<void> sendFriendRequest(String currentUid, String targetUid) async {
+    // Add to current user's sentRequests
+    await _firestore.users.doc(currentUid).update({
+      'sentRequests': FieldValue.arrayUnion([targetUid]),
+    });
 
-    if (!doc.exists) return [];
-
-    final data = doc.data() as Map<String, dynamic>;
-    return List<String>.from(data["friendsList"] ?? []);
+    // Add to target user's friendRequests
+    await _firestore.users.doc(targetUid).update({
+      'friendRequests': FieldValue.arrayUnion([currentUid]),
+    });
   }
 
+  // Accept a friend request
+  Future<void> acceptFriendRequest(
+    String currentUid,
+    String requesterUid,
+  ) async {
+    // Add each other as friends
+    await _firestore.users.doc(currentUid).update({
+      'friends': FieldValue.arrayUnion([requesterUid]),
+      'friendRequests': FieldValue.arrayRemove([requesterUid]),
+    });
+
+    await _firestore.users.doc(requesterUid).update({
+      'friends': FieldValue.arrayUnion([currentUid]),
+      'sentRequests': FieldValue.arrayRemove([currentUid]),
+    });
+  }
+
+  // Decline a friend request
+  Future<void> declineFriendRequest(
+    String currentUid,
+    String requesterUid,
+  ) async {
+    await _firestore.users.doc(currentUid).update({
+      'friendRequests': FieldValue.arrayRemove([requesterUid]),
+    });
+
+    await _firestore.users.doc(requesterUid).update({
+      'sentRequests': FieldValue.arrayRemove([currentUid]),
+    });
+  }
+
+  // Cancel a sent request
+  Future<void> cancelFriendRequest(String currentUid, String targetUid) async {
+    await _firestore.users.doc(currentUid).update({
+      'sentRequests': FieldValue.arrayRemove([targetUid]),
+    });
   Future<void> updateUserStatus(String userId, String status) async {
     await _firestore.users.doc(userId).update({'status': status});
   }
 
+    await _firestore.users.doc(targetUid).update({
+      'friendRequests': FieldValue.arrayRemove([currentUid]),
+    });
+  }
 }

@@ -10,6 +10,8 @@ class UserModel {
   final String email;
   final String phone;
   final List<String> friends;
+  final List<String> friendRequests;
+  final List<String> sentRequests;
   final List<String> preferences;
   final Map<String, List<String>> schedule;
   final String status;
@@ -27,6 +29,8 @@ class UserModel {
     required this.schedule,
     this.status = 'offline',
     required this.fcmToken,
+    required this.friendRequests,
+    required this.sentRequests,
   });
 
   factory UserModel.fromMap(String id, Map<String, dynamic> map) {
@@ -39,6 +43,8 @@ class UserModel {
       phone: map['phone'] as String? ?? '',
       friends: List<String>.from(map['friends'] ?? []),
       preferences: List<String>.from(map['preferences'] ?? []),
+      friendRequests: List<String>.from(map['friendRequests'] ?? []),
+      sentRequests: List<String>.from(map['sentRequests'] ?? []),
       schedule:
           (map['schedule'] as Map<String, dynamic>?)?.map(
             (key, value) => MapEntry(key, List<String>.from(value)),
@@ -58,6 +64,8 @@ class UserModel {
       'phone': phone,
       'friends': friends,
       'preferences': preferences,
+      'friendRequests': friendRequests,
+      'sentRequests': sentRequests,
       'schedule': schedule,
       'status': status,
       'fcmToken': fcmToken, // ← add this
