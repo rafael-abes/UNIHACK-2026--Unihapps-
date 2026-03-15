@@ -224,18 +224,18 @@ class _HomePageState extends State<HomePage> {
         children: [
           Padding(
             padding: const EdgeInsets.all(10),
-            child: SegmentedButton<String>(
-              segments: const [
-                ButtonSegment(value: 'offline', label: Text('Offline')),
-                ButtonSegment(value: 'free', label: Text('Free')),
-                ButtonSegment(value: 'busy', label: Text('Busy')),
-                ButtonSegment(value: 'in-class', label: Text('In-class')),
-              ],
-              selected: {currentStatus},
-              onSelectionChanged: (newSelection) {
-                _setStatus(newSelection.first);
-              },
-            ),
+            // child: SegmentedButton<String>(
+            //   segments: const [
+            //     ButtonSegment(value: 'offline', label: Text('Offline')),
+            //     ButtonSegment(value: 'free', label: Text('Free')),
+            //     ButtonSegment(value: 'busy', label: Text('Busy')),
+            //     ButtonSegment(value: 'in-class', label: Text('In-class')),
+            //   ],
+            //   selected: {currentStatus},
+            //   onSelectionChanged: (newSelection) {
+            //     _setStatus(newSelection.first);
+            //   },
+            // ),
           ),
           Expanded(
             child: locationData == null
