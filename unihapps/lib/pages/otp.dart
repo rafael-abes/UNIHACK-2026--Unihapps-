@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../services/phone_auth.dart';
-import 'friends_list.dart';
+import 'home_page.dart';
 
 class OTPPage extends StatefulWidget {
   final String verificationId;
@@ -36,7 +36,7 @@ class _OTPPageState extends State<OTPPage> {
       if (!mounted) return;
       Navigator.pushAndRemoveUntil(
         context,
-        MaterialPageRoute(builder: (_) => const FriendsPage()),
+        MaterialPageRoute(builder: (_) => const HomePage()),
         (route) => false,
       );
 

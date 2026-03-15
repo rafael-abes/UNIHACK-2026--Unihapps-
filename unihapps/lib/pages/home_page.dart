@@ -8,7 +8,6 @@ import 'profile_page.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'group_detail.dart';
 import 'group_list.dart';
-import '../repositories/user_repositories.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -25,31 +24,26 @@ class _HomePageState extends State<HomePage> {
 
   LocationData? locationData;
 
-  final UserRepository _userRepository = UserRepository();
-  final String userId = 'exampleUserId'; // Replace with actual user ID
-
+  // Status
   final List<String> statuses = ['offline', 'free', 'busy', 'in-class'];
   final Map<String, Color> statusColors = {
-  'offline': Colors.grey,
-  'free': Colors.green,
-  'busy': Colors.red,
-  'in-class': Colors.blue,
+    'offline': Colors.grey,
+    'free': Colors.green,
+    'busy': Colors.red,
+    'in-class': Colors.blue,
   };
-
-  String currentStatus = 'offline';//Default status
+  String currentStatus = 'offline';
 
   void getCurrentLocation() async {
     try {
       await _location.changeSettings(
         accuracy: LocationAccuracy.high,
-        interval: 1000, // Update every 1 second
-        distanceFilter: 0, // Update even if the distance change is 0 meters
+        interval: 1000,
+        distanceFilter: 0,
       );
 
       LocationData currentLocationData = await _location.getLocation();
-      setState(() {
-        locationData = currentLocationData;
-      });
+      setState(() => locationData = currentLocationData);
 
       final GoogleMapController controller = await _googleMapController.future;
 
@@ -77,32 +71,43 @@ class _HomePageState extends State<HomePage> {
             ),
           ),
         );
-
-        setState(() {
-          locationData = newLocationData;
-        });
+        setState(() => locationData = newLocationData);
       });
     } catch (e) {
-      print('Error getting location: $e');
+      debugPrint('Error getting location: $e');
     }
   }
 
-    Future<void> setStatus(String newStatus) async {
-    setState(() {
-      currentStatus = newStatus;
-    });
+  Future<void> _setStatus(String newStatus) async {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) return;
+
+    setState(() => currentStatus = newStatus);
 
     try {
-      await _userRepository.updateUserStatus(userId, newStatus);
+      await _firestore.collection('users').doc(uid).set({
+        'status': newStatus,
+      }, SetOptions(merge: true));
     } catch (e) {
-      print('Error updating status: $e');
+      debugPrint('Error updating status: $e');
     }
   }
- 
+
   @override
   void initState() {
     super.initState();
     getCurrentLocation();
+    _loadCurrentStatus();
+  }
+
+  Future<void> _loadCurrentStatus() async {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) return;
+    final doc = await _firestore.collection('users').doc(uid).get();
+    if (!mounted) return;
+    setState(() {
+      currentStatus = doc.data()?['status'] ?? 'offline';
+    });
   }
 
   void _showFriendsSheet() {
@@ -117,34 +122,62 @@ class _HomePageState extends State<HomePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: locationData == null
-          ? const Center(child: CircularProgressIndicator())
-          : GoogleMap(
-              onMapCreated: (controller) =>
-                  _googleMapController.complete(controller),
-              initialCameraPosition: CameraPosition(
-                target: LatLng(
-                  locationData!.latitude!,
-                  locationData!.longitude!,
-                ),
-                zoom: 14.5,
-              ),
-              markers: {
-                if (locationData != null)
-                  Marker(
-                    markerId: const MarkerId('currentLocation'),
-                    position: LatLng(
-                      locationData!.latitude!,
-                      locationData!.longitude!,
-                    ),
-                  ),
+      appBar: AppBar(
+        title: const Text('UniHapps'),
+        backgroundColor: statusColors[currentStatus] ?? Colors.grey,
+        elevation: 0,
+      ),
+      body: Column(
+        children: [
+          // Status selector
+          Padding(
+            padding: const EdgeInsets.all(10),
+            child: SegmentedButton<String>(
+              segments: const [
+                ButtonSegment(value: 'offline', label: Text('Offline')),
+                ButtonSegment(value: 'free', label: Text('Free')),
+                ButtonSegment(value: 'busy', label: Text('Busy')),
+                ButtonSegment(value: 'in-class', label: Text('In-class')),
+              ],
+              selected: {currentStatus},
+              onSelectionChanged: (newSelection) {
+                _setStatus(newSelection.first);
               },
             ),
+          ),
+
+          // Map
+          Expanded(
+            child: locationData == null
+                ? const Center(child: CircularProgressIndicator())
+                : GoogleMap(
+                    onMapCreated: (controller) =>
+                        _googleMapController.complete(controller),
+                    initialCameraPosition: CameraPosition(
+                      target: LatLng(
+                        locationData!.latitude!,
+                        locationData!.longitude!,
+                      ),
+                      zoom: 14.5,
+                    ),
+                    markers: {
+                      Marker(
+                        markerId: const MarkerId('currentLocation'),
+                        position: LatLng(
+                          locationData!.latitude!,
+                          locationData!.longitude!,
+                        ),
+                      ),
+                    },
+                  ),
+          ),
+        ],
+      ),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: 1,
         onTap: (index) {
           if (index == 0) {
-            _showFriendsSheet(); // ← was Navigator.push to FriendsPage
+            _showFriendsSheet();
           } else if (index == 2) {
             Navigator.push(
               context,
@@ -157,48 +190,16 @@ class _HomePageState extends State<HomePage> {
             icon: Icon(Icons.people_outline),
             activeIcon: Icon(Icons.people),
             label: 'Friends',
-      appBar: AppBar(
-        title: const Text('Home'),
-        backgroundColor: statusColors[currentStatus] ?? Colors.grey,
-      ),
-      body: Column(
-        children: [
-
-          Padding(
-            padding: const EdgeInsets.all(10),
-            child: SegmentedButton<String>(
-              segments: const [
-                ButtonSegment(value: 'offline', label: Text('Offline')),
-                ButtonSegment(value: 'free', label: Text('Free')),
-                ButtonSegment(value: 'busy', label: Text('Busy')),
-                ButtonSegment(value: 'in-class', label: Text('In-class')),
-              ],
-              selected: {currentStatus},
-              onSelectionChanged: (newSelection) {
-                setStatus(newSelection.first);
-              },
-            ),
           ),
-
-          Expanded(
-            child: locationData == null
-                ? const Center(child: CircularProgressIndicator())
-                : GoogleMap(
-                    onMapCreated: (controller) =>
-                        _googleMapController.complete(controller),
-                    initialCameraPosition: CameraPosition(
-                      target: LatLng(
-                          locationData!.latitude!, locationData!.longitude!),
-                      zoom: 14.5,
-                    ),
-                    markers: {
-                      Marker(
-                        markerId: const MarkerId('currentLocation'),
-                        position: LatLng(
-                            locationData!.latitude!, locationData!.longitude!),
-                      ),
-                    },
-                  ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.celebration_outlined),
+            activeIcon: Icon(Icons.celebration),
+            label: 'Happs',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.person_outline),
+            activeIcon: Icon(Icons.person),
+            label: 'Me',
           ),
         ],
       ),
@@ -260,7 +261,6 @@ class _FriendsBottomSheetState extends State<_FriendsBottomSheet>
               ),
             ),
             const SizedBox(height: 16),
-            // Add Friend option
             GestureDetector(
               onTap: () {
                 Navigator.pop(ctx);
@@ -318,7 +318,6 @@ class _FriendsBottomSheetState extends State<_FriendsBottomSheet>
                 ),
               ),
             ),
-            // New Group option
             GestureDetector(
               onTap: () {
                 Navigator.pop(ctx);
@@ -395,7 +394,6 @@ class _FriendsBottomSheetState extends State<_FriendsBottomSheet>
       ),
       child: Column(
         children: [
-          // Handle bar
           Container(
             width: 40,
             height: 4,
@@ -405,8 +403,6 @@ class _FriendsBottomSheetState extends State<_FriendsBottomSheet>
               borderRadius: BorderRadius.circular(2),
             ),
           ),
-
-          // Header — matches Find My style
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
             child: Row(
@@ -420,7 +416,6 @@ class _FriendsBottomSheetState extends State<_FriendsBottomSheet>
                     color: Color(0xFF1A1A2E),
                   ),
                 ),
-                // Plus button — shows add options
                 GestureDetector(
                   onTap: _showAddOptions,
                   child: Container(
@@ -439,8 +434,6 @@ class _FriendsBottomSheetState extends State<_FriendsBottomSheet>
               ],
             ),
           ),
-
-          // Tabs — People / Groups
           TabBar(
             controller: _tabController,
             labelColor: Colors.deepPurple,
@@ -451,13 +444,11 @@ class _FriendsBottomSheetState extends State<_FriendsBottomSheet>
               Tab(text: 'Groups'),
             ],
           ),
-
-          // Tab content
           Expanded(
             child: TabBarView(
               controller: _tabController,
               children: [
-                // People tab — friends list
+                // People tab
                 uid == null
                     ? const SizedBox()
                     : StreamBuilder<DocumentSnapshot>(
@@ -494,6 +485,19 @@ class _FriendsBottomSheetState extends State<_FriendsBottomSheet>
                                       color: Colors.grey,
                                       fontSize: 15,
                                     ),
+                                  ),
+                                  const SizedBox(height: 12),
+                                  TextButton(
+                                    onPressed: () {
+                                      Navigator.pop(context);
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) => const FriendsPage(),
+                                        ),
+                                      );
+                                    },
+                                    child: const Text('Add Friends'),
                                   ),
                                 ],
                               ),
@@ -615,6 +619,19 @@ class _FriendsBottomSheetState extends State<_FriendsBottomSheet>
                                       color: Colors.grey,
                                       fontSize: 15,
                                     ),
+                                  ),
+                                  const SizedBox(height: 12),
+                                  TextButton(
+                                    onPressed: () {
+                                      Navigator.pop(context);
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) => const GroupsPage(),
+                                        ),
+                                      );
+                                    },
+                                    child: const Text('Create Group'),
                                   ),
                                 ],
                               ),
