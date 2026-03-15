@@ -19,26 +19,38 @@ class HappsModel {
     required this.participants,
   });
 
+  static String _refToId(dynamic v) {
+    if (v == null) return '';
+    if (v is DocumentReference) return v.id;
+    if (v is String) return v;
+    return v.toString();
+  }
+
   factory HappsModel.fromMap(String id, Map<String, dynamic> map) {
     return HappsModel(
       id: id,
-      organizerId: map['organizerId'] as String? ?? '',
+      organizerId: _refToId(map['organizer']),
       title: map['title'] as String? ?? '',
       when: (map['when'] as Timestamp?)?.toDate() ?? DateTime.now(),
       category: map['category'] as String? ?? '',
-      location: map['where'] as GeoPoint? ?? GeoPoint(0, 0),
-      participants: List<String>.from(map['participants'] ?? []),
+      location: map['where'] is GeoPoint
+          ? map['where'] as GeoPoint
+          : const GeoPoint(0, 0),
+      participants: (map['participants'] as List<dynamic>? ?? [])
+          .map((p) => _refToId(p))
+          .toList(),
     );
   }
 
   Map<String, dynamic> toMap() {
+    final db = FirebaseFirestore.instance;
     return {
-      'organizerId': organizerId,
+      'organizer': db.doc('users/$organizerId'),
       'title': title,
       'when': Timestamp.fromDate(when),
       'category': category,
       'where': location,
-      'participants': participants,
+      'participants': participants.map((p) => db.doc('users/$p')).toList(),
     };
   }
 }
