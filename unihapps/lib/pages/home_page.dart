@@ -20,8 +20,6 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   final Completer<GoogleMapController> _googleMapController = Completer();
   final Location _location = Location();
-  final _firestore = FirebaseFirestore.instance;
-  final _auth = FirebaseAuth.instance;
 
   LocationData? locationData;
 
@@ -117,53 +115,12 @@ class _HomePageState extends State<HomePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: locationData == null
-          ? const Center(child: CircularProgressIndicator())
-          : GoogleMap(
-              onMapCreated: (controller) =>
-                  _googleMapController.complete(controller),
-              initialCameraPosition: CameraPosition(
-                target: LatLng(
-                  locationData!.latitude!,
-                  locationData!.longitude!,
-                ),
-                zoom: 14.5,
-              ),
-              markers: {
-                if (locationData != null)
-                  Marker(
-                    markerId: const MarkerId('currentLocation'),
-                    position: LatLng(
-                      locationData!.latitude!,
-                      locationData!.longitude!,
-                    ),
-                  ),
-              },
-            ),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: 1,
-        onTap: (index) {
-          if (index == 0) {
-            _showFriendsSheet(); // ← was Navigator.push to FriendsPage
-          } else if (index == 2) {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const ProfilePage()),
-            );
-          }
-        },
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.people_outline),
-            activeIcon: Icon(Icons.people),
-            label: 'Friends',
       appBar: AppBar(
         title: const Text('Home'),
         backgroundColor: statusColors[currentStatus] ?? Colors.grey,
       ),
       body: Column(
         children: [
-
           Padding(
             padding: const EdgeInsets.all(10),
             child: SegmentedButton<String>(
@@ -179,7 +136,6 @@ class _HomePageState extends State<HomePage> {
               },
             ),
           ),
-
           Expanded(
             child: locationData == null
                 ? const Center(child: CircularProgressIndicator())
@@ -199,6 +155,36 @@ class _HomePageState extends State<HomePage> {
                       ),
                     },
                   ),
+          ),
+        ],
+      ),
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: 1,
+        onTap: (index) {
+          if (index == 0) {
+            _showFriendsSheet();
+          } else if (index == 2) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const ProfilePage()),
+            );
+          }
+        },
+        items: const [
+          BottomNavigationBarItem(
+            icon: Icon(Icons.people_outline),
+            activeIcon: Icon(Icons.people),
+            label: 'Friends',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.home_outlined),
+            activeIcon: Icon(Icons.home),
+            label: 'Home',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.person_outline),
+            activeIcon: Icon(Icons.person),
+            label: 'Profile',
           ),
         ],
       ),

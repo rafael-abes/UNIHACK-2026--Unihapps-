@@ -66,12 +66,13 @@ class UserRepository {
     await _firestore.users.doc(currentUid).update({
       'sentRequests': FieldValue.arrayRemove([targetUid]),
     });
-  Future<void> updateUserStatus(String userId, String status) async {
-    await _firestore.users.doc(userId).update({'status': status});
-  }
 
     await _firestore.users.doc(targetUid).update({
       'friendRequests': FieldValue.arrayRemove([currentUid]),
     });
+  }
+
+  Future<void> updateUserStatus(String userId, String status) async {
+    await _firestore.users.doc(userId).update({'status': status});
   }
 }
