@@ -281,21 +281,18 @@ class _HomePageState extends State<HomePage> {
             );
           }
         },
-        items: const [
+        items: [
           BottomNavigationBarItem(
-            icon: Icon(Icons.people_outline),
-            activeIcon: Icon(Icons.people),
+            icon: Image.asset('assets/images/friends_button.png', height: 28),
             label: 'Friends',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.home_outlined),
-            activeIcon: Icon(Icons.home),
+            icon: Image.asset('assets/images/happs_button.png', height: 28),
             label: 'Happs',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.person_outline),
-            activeIcon: Icon(Icons.person),
-            label: 'Profile',
+            icon: Image.asset('assets/images/me_button.png', height: 28),
+            label: 'Me',
           ),
         ],
       ),
