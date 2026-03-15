@@ -43,7 +43,8 @@ dependencies:
   flutter_contacts: ^1.1.9+1
   permission_handler: ^11.3.1
   firebase_messaging: any
-
+  firebase_storage: 13.1.0
+  image_picker: ^1.1.2
   flutter_svg: ^2.0.17
   location: ^8.0.0
   flutter_polyline_points: ^2.1.0
