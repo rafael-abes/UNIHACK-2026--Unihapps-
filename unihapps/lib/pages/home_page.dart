@@ -19,8 +19,6 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   final Completer<GoogleMapController> _googleMapController = Completer();
   final Location _location = Location();
-  final _firestore = FirebaseFirestore.instance;
-  final _auth = FirebaseAuth.instance;
 
   LocationData? locationData;
 
@@ -129,7 +127,6 @@ class _HomePageState extends State<HomePage> {
       ),
       body: Column(
         children: [
-          // Status selector
           Padding(
             padding: const EdgeInsets.all(10),
             child: SegmentedButton<String>(
@@ -145,8 +142,6 @@ class _HomePageState extends State<HomePage> {
               },
             ),
           ),
-
-          // Map
           Expanded(
             child: locationData == null
                 ? const Center(child: CircularProgressIndicator())
@@ -192,14 +187,14 @@ class _HomePageState extends State<HomePage> {
             label: 'Friends',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.celebration_outlined),
-            activeIcon: Icon(Icons.celebration),
-            label: 'Happs',
+            icon: Icon(Icons.home_outlined),
+            activeIcon: Icon(Icons.home),
+            label: 'Home',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.person_outline),
             activeIcon: Icon(Icons.person),
-            label: 'Me',
+            label: 'Profile',
           ),
         ],
       ),
