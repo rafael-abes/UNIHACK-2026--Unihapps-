@@ -43,25 +43,27 @@ class AuthWrapper extends StatelessWidget {
   }
 
   Future<void> _ensureUserDocument(User user) async {
-  final _userRepository = UserRepository();
-  final existingUser = await _userRepository.getUser(user.uid);
+    final _userRepository = UserRepository();
+    final existingUser = await _userRepository.getUser(user.uid);
 
-  if (existingUser == null) {
-    final token = await FirebaseMessaging.instance.getToken() ?? '';
-    
-    final newUser = UserModel(
-      id: user.uid,
-      firstName: user.displayName?.split(' ').first ?? '',
-      lastName: user.displayName?.split(' ').last ?? '',
-      username: '',
-      email: user.email ?? '',
-      phone: '',
-      friends: [],
-      preferences: [],
-      schedule: {},
-      fcmToken: token, // ← add this
-    );
-    await _userRepository.createUser(newUser);
+    if (existingUser == null) {
+      final token = await FirebaseMessaging.instance.getToken() ?? '';
+
+      final newUser = UserModel(
+        id: user.uid,
+        firstName: user.displayName?.split(' ').first ?? '',
+        lastName: user.displayName?.split(' ').last ?? '',
+        username: '',
+        email: user.email ?? '',
+        phone: '',
+        friends: [],
+        friendRequests: [], // ← make sure these are here
+        sentRequests: [],
+        preferences: [],
+        schedule: {},
+        fcmToken: token, // ← add this
+      );
+      await _userRepository.createUser(newUser);
+    }
   }
-}
 }

@@ -210,7 +210,8 @@ class _SignUpPageState extends State<SignUpPage> {
       );
       final uid = credential.user?.uid;
       if (uid != null) {
-        final token = await FirebaseMessaging.instance.getToken() ?? ''; // ← move here
+        final token =
+            await FirebaseMessaging.instance.getToken() ?? ''; // ← move here
         print("FCM Token: $token");
         final user = UserModel(
           id: uid,
@@ -220,6 +221,8 @@ class _SignUpPageState extends State<SignUpPage> {
           email: _emailController.text.trim(),
           phone: '',
           friends: [],
+          friendRequests: [],
+          sentRequests: [],
           preferences: _selectedPreferences.toList(),
           schedule: _scheduleForModel,
           fcmToken: token, // ← add this

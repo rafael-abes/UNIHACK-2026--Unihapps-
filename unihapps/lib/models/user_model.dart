@@ -25,8 +25,8 @@ class UserModel {
     required this.preferences,
     required this.schedule,
     required this.fcmToken,
-    this.friendRequests = const [],
-    this.sentRequests = const [],
+    required this.friendRequests,
+    required this.sentRequests,
   });
 
   factory UserModel.fromMap(String id, Map<String, dynamic> map) {

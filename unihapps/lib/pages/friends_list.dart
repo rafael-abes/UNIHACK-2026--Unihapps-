@@ -6,8 +6,6 @@ import 'package:flutter_contacts/flutter_contacts.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'dart:async';
 import '../repositories/user_repositories.dart';
-import 'home_page.dart';
-import 'profile_page.dart';
 
 // Top-level function for compute()
 List<String> _extractPhoneNumbers(List<Contact> contacts) {
@@ -32,7 +30,9 @@ class FriendsPage extends StatefulWidget {
   State<FriendsPage> createState() => _FriendsPageState();
 }
 
-class _FriendsPageState extends State<FriendsPage> {
+// ← Fix 1: added SingleTickerProviderStateMixin
+class _FriendsPageState extends State<FriendsPage>
+    with SingleTickerProviderStateMixin {
   final _searchController = TextEditingController();
   final _firestore = FirebaseFirestore.instance;
   final _auth = FirebaseAuth.instance;
@@ -41,13 +41,12 @@ class _FriendsPageState extends State<FriendsPage> {
   List<Map<String, dynamic>> _searchResults = [];
   List<Map<String, dynamic>> _contactMatches = [];
   List<String> _friendIds = [];
-  List<String> _sentRequestIds = []; // ← track sent requests
-  List<String> _incomingRequestIds = []; // ← track incoming requests
+  List<String> _sentRequestIds = [];
+  List<String> _incomingRequestIds = [];
 
   bool _isSearching = false;
-  bool _hasSearched = false;
   bool _isSyncingContacts = false;
-  bool _hasSearched = false;
+  bool _hasSearched = false; // ← only declared once
 
   Timer? _debounceTimer;
   late TabController _tabController;
@@ -55,7 +54,7 @@ class _FriendsPageState extends State<FriendsPage> {
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this); // ← 3 tabs now
+    _tabController = TabController(length: 3, vsync: this);
     _loadUserData();
   }
 
@@ -63,6 +62,7 @@ class _FriendsPageState extends State<FriendsPage> {
   void dispose() {
     _debounceTimer?.cancel();
     _searchController.dispose();
+    _tabController.dispose(); // ← added missing dispose
     super.dispose();
   }
 
@@ -121,7 +121,6 @@ class _FriendsPageState extends State<FriendsPage> {
     });
   }
 
-  // Send friend request
   Future<void> _sendFriendRequest(String targetUid) async {
     final currentUid = _auth.currentUser?.uid;
     if (currentUid == null) return;
@@ -136,7 +135,6 @@ class _FriendsPageState extends State<FriendsPage> {
     ).showSnackBar(const SnackBar(content: Text('Friend request sent!')));
   }
 
-  // Cancel sent request
   Future<void> _cancelRequest(String targetUid) async {
     final currentUid = _auth.currentUser?.uid;
     if (currentUid == null) return;
@@ -151,7 +149,6 @@ class _FriendsPageState extends State<FriendsPage> {
     ).showSnackBar(const SnackBar(content: Text('Friend request cancelled')));
   }
 
-  // Accept incoming request
   Future<void> _acceptRequest(String requesterUid) async {
     final currentUid = _auth.currentUser?.uid;
     if (currentUid == null) return;
@@ -169,7 +166,6 @@ class _FriendsPageState extends State<FriendsPage> {
     ).showSnackBar(const SnackBar(content: Text('Friend request accepted!')));
   }
 
-  // Decline incoming request
   Future<void> _declineRequest(String requesterUid) async {
     final currentUid = _auth.currentUser?.uid;
     if (currentUid == null) return;
@@ -284,9 +280,6 @@ class _FriendsPageState extends State<FriendsPage> {
     }
   }
 
-  List<Map<String, dynamic>> get _displayList =>
-      _hasSearched ? _searchResults : _contactMatches;
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -310,7 +303,6 @@ class _FriendsPageState extends State<FriendsPage> {
           tabs: [
             const Tab(text: 'Find Friends'),
             const Tab(text: 'My Friends'),
-            // Show badge on requests tab if incoming requests exist
             Tab(
               child: Row(
                 mainAxisSize: MainAxisSize.min,
@@ -345,7 +337,7 @@ class _FriendsPageState extends State<FriendsPage> {
         children: [
           _buildFindFriendsTab(),
           _buildMyFriendsTab(),
-          _buildRequestsTab(), // ← new tab
+          _buildRequestsTab(),
         ],
       ),
     );
@@ -425,12 +417,14 @@ class _FriendsPageState extends State<FriendsPage> {
           ),
         ),
         const SizedBox(height: 16),
+        // ← Fix 2: renamed _buildBody to _buildSearchResults
         Expanded(child: _buildSearchResults()),
       ],
     );
   }
 
-  Widget _buildBody() {
+  // ← Fix 2: renamed from _buildBody to _buildSearchResults
+  Widget _buildSearchResults() {
     if (_isSearching) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -500,7 +494,6 @@ class _FriendsPageState extends State<FriendsPage> {
     );
   }
 
-  // My Friends tab
   Widget _buildMyFriendsTab() {
     final uid = _auth.currentUser?.uid;
     if (uid == null) return const SizedBox();
@@ -561,7 +554,6 @@ class _FriendsPageState extends State<FriendsPage> {
     );
   }
 
-  // Requests tab — incoming and sent
   Widget _buildRequestsTab() {
     final uid = _auth.currentUser?.uid;
     if (uid == null) return const SizedBox();
@@ -604,7 +596,6 @@ class _FriendsPageState extends State<FriendsPage> {
         return ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            // Incoming requests
             if (incoming.isNotEmpty) ...[
               const Text(
                 'Incoming Requests',
@@ -615,13 +606,9 @@ class _FriendsPageState extends State<FriendsPage> {
                 ),
               ),
               const SizedBox(height: 8),
-              ...incoming.map(
-                (requesterUid) => _buildIncomingRequestTile(requesterUid),
-              ),
+              ...incoming.map((uid) => _buildIncomingRequestTile(uid)),
               const SizedBox(height: 24),
             ],
-
-            // Sent requests
             if (sent.isNotEmpty) ...[
               const Text(
                 'Sent Requests',
@@ -632,7 +619,7 @@ class _FriendsPageState extends State<FriendsPage> {
                 ),
               ),
               const SizedBox(height: 8),
-              ...sent.map((targetUid) => _buildSentRequestTile(targetUid)),
+              ...sent.map((uid) => _buildSentRequestTile(uid)),
             ],
           ],
         );
@@ -640,7 +627,6 @@ class _FriendsPageState extends State<FriendsPage> {
     );
   }
 
-  // Incoming request tile with accept/decline
   Widget _buildIncomingRequestTile(String requesterUid) {
     return FutureBuilder<DocumentSnapshot>(
       future: _firestore.collection('users').doc(requesterUid).get(),
@@ -695,12 +681,10 @@ class _FriendsPageState extends State<FriendsPage> {
             trailing: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Accept
                 IconButton(
                   icon: const Icon(Icons.check_circle, color: Colors.green),
                   onPressed: () => _acceptRequest(requesterUid),
                 ),
-                // Decline
                 IconButton(
                   icon: const Icon(Icons.cancel, color: Colors.redAccent),
                   onPressed: () => _declineRequest(requesterUid),
@@ -713,7 +697,6 @@ class _FriendsPageState extends State<FriendsPage> {
     );
   }
 
-  // Sent request tile with cancel option
   Widget _buildSentRequestTile(String targetUid) {
     return FutureBuilder<DocumentSnapshot>(
       future: _firestore.collection('users').doc(targetUid).get(),
@@ -781,7 +764,6 @@ class _FriendsPageState extends State<FriendsPage> {
     );
   }
 
-  // Search result / contact match tile
   Widget _buildUserTile(Map<String, dynamic> user) {
     final displayName = '${user['firstName'] ?? ''} ${user['lastName'] ?? ''}'
         .trim();
@@ -838,7 +820,6 @@ class _FriendsPageState extends State<FriendsPage> {
                 backgroundColor: Color(0xFFEDE7F6),
               )
             : requestReceived
-            // They sent you a request — show accept/decline
             ? Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -853,7 +834,6 @@ class _FriendsPageState extends State<FriendsPage> {
                 ],
               )
             : requestSent
-            // You sent them a request — show pending/cancel
             ? OutlinedButton(
                 onPressed: () => _cancelRequest(uid),
                 style: OutlinedButton.styleFrom(
@@ -867,7 +847,6 @@ class _FriendsPageState extends State<FriendsPage> {
                   style: TextStyle(color: Colors.grey),
                 ),
               )
-            // No relationship — show add button
             : ElevatedButton(
                 onPressed: () => _sendFriendRequest(uid),
                 style: ElevatedButton.styleFrom(
@@ -884,7 +863,6 @@ class _FriendsPageState extends State<FriendsPage> {
     );
   }
 
-  // Friends list tile — no add button
   Widget _buildFriendTile(Map<String, dynamic> user) {
     final displayName = '${user['firstName'] ?? ''} ${user['lastName'] ?? ''}'
         .trim();
